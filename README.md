@@ -48,8 +48,8 @@ Access the tutorial anytime from the extension popup!
 ### **Installation (Development)**
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/prompt_tracer.git
-cd prompt_tracer
+git clone https://github.com/yourusername/prompt_tracer.git 
+cd prompt_tracer      
 
 # Load in Chrome
 # 1. Open chrome://extensions/
