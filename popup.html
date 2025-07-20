@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Tracer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 480px;
+            min-height: 650px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow: hidden;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 25px 20px 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .logo-text {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+
+        .tagline {
+            color: #666;
+            font-size: 15px;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        .version-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .content {
+            padding: 25px;
+            background: white;
+            min-height: 550px;
+            overflow-y: auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%);
+            border: 1px solid #e1e5ff;
+            border-radius: 16px;
+            padding: 22px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 800;
+            color: #667eea;
+            margin-bottom: 6px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-icon {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+        }
+
+        .platform-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .platform-tag {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+            transition: transform 0.2s ease;
+        }
+
+        .platform-tag:hover {
+            transform: scale(1.05);
+        }
+
+        .platform-count {
+            background: rgba(255, 255, 255, 0.25);
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .prompt-list {
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .prompt-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .prompt-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 12px 0 0 12px;
+        }
+
+        .prompt-item:hover {
+            background: #e9ecef;
+            transform: translateX(3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .prompt-text {
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
+        .prompt-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .prompt-platform {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .score-badge {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .score-excellent { background: #d4edda; color: #155724; }
+        .score-good { background: #d1ecf1; color: #0c5460; }
+        .score-average { background: #fff3cd; color: #856404; }
+        .score-poor { background: #f8d7da; color: #721c24; }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 25px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px 22px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #666;
+            border: 2px solid #e9ecef;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #666;
+        }
+
+        .empty-icon {
+            font-size: 56px;
+            margin-bottom: 18px;
+            opacity: 0.6;
+        }
+
+        .empty-text {
+            font-size: 18px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .empty-subtext {
+            font-size: 15px;
+            opacity: 0.7;
+            line-height: 1.5;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px 20px;
+            color: #666;
+        }
+
+        .spinner {
+            width: 35px;
+            height: 35px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 18px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 25px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 6px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px 18px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .chart-container {
+            height: 220px;
+            margin: 25px 0;
+            background: #f8f9fa;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            border: 2px dashed #e9ecef;
+        }
+
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+
+        .settings-info {
+            flex: 1;
+        }
+
+        .settings-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .settings-description {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 52px;
+            height: 26px;
+            background: #ccc;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(26px);
+        }
+
+        .about-section {
+            background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .about-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 12px;
+        }
+
+        .about-text {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .feature-list {
+            margin-top: 15px;
+            padding-left: 20px;
+        }
+
+        .feature-list li {
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #5a6fd8, #6a4190);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="version-badge">v1.0</div>
+        <div class="logo">
+            <div class="logo-icon">🔍</div>
+            <div class="logo-text">Prompt Tracer</div>
+        </div>
+        <div class="tagline">Optimize your AI prompts</div>
+    </div>
+
+    <div class="content">
+        <div class="tabs">
+            <div class="tab active" data-tab="dashboard">Dashboard</div>
+            <div class="tab" data-tab="analytics">Analytics</div>
+            <div class="tab" data-tab="settings">Settings</div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div class="tab-content active" id="dashboard">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-prompts">0</div>
+                    <div class="stat-label">Total Prompts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avg-score">0%</div>
+                    <div class="stat-label">Avg Score</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon">📊</div>
+                    Platforms Used
+                </div>
+                <div class="platform-tags" id="platform-tags">
+                    <!-- Platform tags will be populated here -->
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon">📝</div>
+                    Recent Prompts
+                </div>
+                <div class="prompt-list" id="prompt-list">
+                    <!-- Prompts will be populated here -->
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-secondary" id="clear-data">
+                    <span>🗑️</span>
+                    Clear Data
+                </button>
+                <button class="btn btn-primary" id="export-data">
+                    <span>📊</span>
+                    Export Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div class="tab-content" id="analytics">
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon">📈</div>
+                    Performance Trends
+                </div>
+                <div class="chart-container">
+                    <div>📊 Chart visualization coming soon...</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon">🎯</div>
+                    Score Distribution
+                </div>
+                <div class="chart-container">
+                    <div>📈 Score distribution chart coming soon...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div class="tab-content" id="settings">
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon">⚙️</div>
+                    Preferences
+                </div>
+                
+                <div class="settings-item">
+                    <div class="settings-info">
+                        <div class="settings-title">Auto Analysis</div>
+                        <div class="settings-description">Automatically analyze prompts as you type</div>
+                    </div>
+                    <div class="toggle-switch active" id="auto-analysis-toggle"></div>
+                </div>
+
+                <div class="settings-item">
+                    <div class="settings-info">
+                        <div class="settings-title">Show Analysis Panel</div>
+                        <div class="settings-description">Display floating analysis panel</div>
+                    </div>
+                    <div class="toggle-switch active" id="show-panel-toggle"></div>
+                </div>
+
+                <div class="settings-item">
+                    <div class="settings-info">
+                        <div class="settings-title">Save Prompt History</div>
+                        <div class="settings-description">Store your prompt history locally</div>
+                    </div>
+                    <div class="toggle-switch active" id="save-history-toggle"></div>
+                </div>
+
+                <div class="settings-item">
+                    <div class="settings-info">
+                        <div class="settings-title">Advanced Optimization</div>
+                        <div class="settings-description">Use intelligent rules to optimize your prompts (Privacy-safe)</div>
+                    </div>
+                    <div class="toggle-switch active" id="llm-optimization-toggle"></div>
+                </div>
+
+                <div class="settings-item">
+                    <div class="settings-info">
+                        <div class="settings-title">OpenAI API Key (Premium)</div>
+                        <div class="settings-description">Optional: Your API key for enhanced AI optimization. <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #667eea; text-decoration: none;">Get your key here</a></div>
+                    </div>
+                    <input type="password" id="openai-api-key" placeholder="sk-..." style="width: 200px; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                </div>
+                
+                <div class="settings-item">
+                    <div class="settings-info">
+                        <div class="settings-title">API Status</div>
+                        <div class="settings-description">Premium AI optimization status</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span id="api-status-indicator" style="font-size: 16px;">⚪</span>
+                        <span id="api-status-text" style="font-size: 12px; color: #666;">Using free optimization</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="about-section">
+                <div class="about-title">About Prompt Tracer</div>
+                <div class="about-text">
+                    <p><strong>Prompt Tracer v1.0</strong></p>
+                    <p>Privacy-first prompt optimization across ChatGPT, Claude, Grok, and Gemini.</p>
+                    
+                    <ul class="feature-list">
+                        <li>🆓 Free advanced rule-based optimization</li>
+                        <li>🔒 100% privacy-safe (no API keys required)</li>
+                        <li>🎯 Real-time prompt analysis</li>
+                        <li>📊 Performance scoring</li>
+                        <li>⭐ Optional premium AI optimization</li>
+                        <li>📈 Analytics and insights</li>
+                    </ul>
+                    
+                    <div class="tutorial-section" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                        <h4 style="margin: 0 0 10px 0; color: #333;">Need Help?</h4>
+                        <button id="start-tutorial" class="tutorial-btn" style="
+                            background: linear-gradient(135deg, #667eea, #764ba2);
+                            color: white;
+                            border: none;
+                            padding: 10px 16px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-weight: 500;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            transition: transform 0.2s;
+                        ">
+                            <span style="font-size: 16px;">🎓</span>
+                            Start Interactive Tutorial
+                        </button>
+                        <p style="margin: 8px 0 0 0; font-size: 12px; color: #666;">
+                            Learn how to use Prompt Tracer effectively in 2 minutes
+                        </p>
+                    </div>
+                    
+                    <p style="margin-top: 15px; font-size: 12px; opacity: 0.7;">
+                        Built with ❤️ for better AI interactions
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html> 
