@@ -53,6 +53,8 @@ function loadData() {
     chrome.storage.local.get(['promptHistory'], function(result) {
         const history = result.promptHistory || [];
         updateDashboard(history);
+        updateAnalytics(history);
+        updateAchievements(history);
     });
 }
 
@@ -334,4 +336,197 @@ function setupTutorialButton() {
 }
 
 // Initialize tutorial button
-setupTutorialButton(); 
+setupTutorialButton();
+
+// Enhanced Analytics Functions
+function updateAnalytics(history) {
+    if (!history || history.length === 0) {
+        showEmptyAnalytics();
+        return;
+    }
+
+    // Initialize chart library
+    const charts = new PromptTracerCharts();
+    
+    // Update trend chart
+    updateTrendChart(charts, history);
+    
+    // Update platform chart
+    updatePlatformChart(charts, history);
+    
+    // Update score distribution chart
+    updateScoreDistributionChart(charts, history);
+}
+
+function updateTrendChart(charts, history) {
+    // Get last 10 prompts for trend
+    const recentPrompts = history.slice(-10);
+    const trendData = recentPrompts.map((prompt, index) => ({
+        score: Math.round((prompt.metrics?.overallScore || 0) * 100),
+        timestamp: prompt.timestamp,
+        platform: prompt.platform
+    }));
+    
+    charts.createTrendChart('trend-chart', trendData);
+    document.getElementById('trend-chart').classList.add('loaded');
+}
+
+function updatePlatformChart(charts, history) {
+    const platformData = {};
+    history.forEach(prompt => {
+        const platform = prompt.platform || 'unknown';
+        platformData[platform] = (platformData[platform] || 0) + 1;
+    });
+    
+    charts.createPlatformChart('platform-chart', platformData);
+    document.getElementById('platform-chart').classList.add('loaded');
+}
+
+function updateScoreDistributionChart(charts, history) {
+    const scoreRanges = {
+        '0-20': 0,
+        '21-40': 0,
+        '41-60': 0,
+        '61-80': 0,
+        '81-100': 0
+    };
+    
+    history.forEach(prompt => {
+        const score = Math.round((prompt.metrics?.overallScore || 0) * 100);
+        if (score <= 20) scoreRanges['0-20']++;
+        else if (score <= 40) scoreRanges['21-40']++;
+        else if (score <= 60) scoreRanges['41-60']++;
+        else if (score <= 80) scoreRanges['61-80']++;
+        else scoreRanges['81-100']++;
+    });
+    
+    const distributionData = Object.entries(scoreRanges).map(([range, count]) => ({
+        range,
+        count
+    })).filter(item => item.count > 0);
+    
+    charts.createScoreDistributionChart('score-chart', distributionData);
+    document.getElementById('score-chart').classList.add('loaded');
+}
+
+function showEmptyAnalytics() {
+    const containers = ['trend-chart', 'platform-chart', 'score-chart'];
+    containers.forEach(id => {
+        const container = document.getElementById(id);
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align: center; color: #666; padding: 40px;">
+                    <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.6;">📊</div>
+                    <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No Analytics Yet</div>
+                    <div style="font-size: 14px; opacity: 0.8;">Start using prompts to see your analytics</div>
+                </div>
+            `;
+            container.classList.add('loaded');
+        }
+    });
+}
+
+function updateAchievements(history) {
+    const container = document.getElementById('achievements-container');
+    if (!container) return;
+    
+    const achievements = calculateAchievements(history);
+    
+    if (achievements.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; color: #666; padding: 40px;">
+                <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.6;">🏆</div>
+                <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No Achievements Yet</div>
+                <div style="font-size: 14px; opacity: 0.8;">Keep improving your prompts to unlock achievements!</div>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = achievements.map(achievement => `
+        <div class="achievement ${achievement.unlocked ? 'unlocked' : ''}">
+            <div class="achievement-icon">${achievement.icon}</div>
+            <div class="achievement-info">
+                <div class="achievement-title">${achievement.title}</div>
+                <div class="achievement-description">${achievement.description}</div>
+                ${achievement.progress !== undefined ? `
+                    <div class="achievement-progress">${achievement.progressText}</div>
+                    <div class="achievement-progress-bar">
+                        <div class="achievement-progress-fill" style="width: ${achievement.progress}%"></div>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function calculateAchievements(history) {
+    const achievements = [];
+    const totalPrompts = history.length;
+    const avgScore = totalPrompts > 0 ? 
+        history.reduce((sum, p) => sum + (p.metrics?.overallScore || 0), 0) / totalPrompts * 100 : 0;
+    
+    // First Prompt Achievement
+    achievements.push({
+        icon: '🎉',
+        title: 'Getting Started',
+        description: 'Analyze your first prompt',
+        unlocked: totalPrompts >= 1,
+        progress: Math.min(totalPrompts, 1) * 100,
+        progressText: `${Math.min(totalPrompts, 1)}/1 prompts analyzed`
+    });
+    
+    // Prompt Explorer Achievement
+    achievements.push({
+        icon: '🚀',
+        title: 'Prompt Explorer',
+        description: 'Analyze 10 prompts',
+        unlocked: totalPrompts >= 10,
+        progress: Math.min(totalPrompts, 10) * 10,
+        progressText: `${Math.min(totalPrompts, 10)}/10 prompts analyzed`
+    });
+    
+    // Prompt Master Achievement
+    achievements.push({
+        icon: '👑',
+        title: 'Prompt Master',
+        description: 'Analyze 50 prompts',
+        unlocked: totalPrompts >= 50,
+        progress: Math.min(totalPrompts, 50) * 2,
+        progressText: `${Math.min(totalPrompts, 50)}/50 prompts analyzed`
+    });
+    
+    // Quality Seeker Achievement
+    achievements.push({
+        icon: '⭐',
+        title: 'Quality Seeker',
+        description: 'Achieve 80% average score',
+        unlocked: avgScore >= 80,
+        progress: Math.min(avgScore, 80),
+        progressText: `${Math.round(avgScore)}% average score (target: 80%)`
+    });
+    
+    // Platform Explorer Achievement
+    const platforms = new Set(history.map(p => p.platform)).size;
+    achievements.push({
+        icon: '🌐',
+        title: 'Platform Explorer',
+        description: 'Use 3 different AI platforms',
+        unlocked: platforms >= 3,
+        progress: Math.min(platforms, 3) * 33.33,
+        progressText: `${platforms}/3 platforms used`
+    });
+    
+    // Consistency Champion Achievement
+    const highQualityPrompts = history.filter(p => (p.metrics?.overallScore || 0) * 100 >= 70).length;
+    achievements.push({
+        icon: '🏆',
+        title: 'Consistency Champion',
+        description: 'Get 70%+ score on 10 prompts',
+        unlocked: highQualityPrompts >= 10,
+        progress: Math.min(highQualityPrompts, 10) * 10,
+        progressText: `${highQualityPrompts}/10 high-quality prompts`
+    });
+    
+    return achievements;
+} 
