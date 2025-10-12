@@ -1231,7 +1231,7 @@ class PromptTracer {
       <div style="padding: 24px; border-bottom: 1px solid #f0f0f0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <h3 style="margin: 0; color: #333; font-size: 20px; font-weight: 700;">🔍 Prompt Analysis</h3>
-          <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; cursor: pointer; font-size: 24px; color: #666; padding: 4px;">×</button>
+          <button id="close-analysis-panel" style="background: none; border: none; cursor: pointer; font-size: 24px; color: #666; padding: 4px; border-radius: 4px; transition: background-color 0.2s;">×</button>
         </div>
         
         <div style="text-align: center; margin-bottom: 24px;">
@@ -1324,6 +1324,25 @@ class PromptTracer {
     `;
 
     document.body.appendChild(panel);
+
+    // Add close button functionality
+    const closeButton = panel.querySelector('#close-analysis-panel');
+    if (closeButton) {
+      closeButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        panel.remove();
+      });
+      
+      // Add hover effect
+      closeButton.addEventListener('mouseenter', () => {
+        closeButton.style.backgroundColor = '#f0f0f0';
+      });
+      
+      closeButton.addEventListener('mouseleave', () => {
+        closeButton.style.backgroundColor = 'transparent';
+      });
+    }
 
     // Add copy functionality
     const copyButton = panel.querySelector('#copy-optimized');
