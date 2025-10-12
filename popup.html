@@ -499,6 +499,131 @@
         ::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(135deg, #5a6fd8, #6a4190);
         }
+
+        /* Achievements Styles */
+        .achievement {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%);
+            border: 1px solid #e1e5ff;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .achievement:hover {
+            transform: translateX(3px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .achievement.unlocked {
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
+            border-color: #c3e6cb;
+        }
+
+        .achievement-icon {
+            font-size: 24px;
+            margin-right: 12px;
+            opacity: 0.6;
+        }
+
+        .achievement.unlocked .achievement-icon {
+            opacity: 1;
+        }
+
+        .achievement-info {
+            flex: 1;
+        }
+
+        .achievement-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 2px;
+            font-size: 14px;
+        }
+
+        .achievement.unlocked .achievement-title {
+            color: #155724;
+        }
+
+        .achievement-description {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.3;
+        }
+
+        .achievement.unlocked .achievement-description {
+            color: #155724;
+        }
+
+        .achievement-progress {
+            margin-top: 4px;
+            font-size: 11px;
+            color: #999;
+        }
+
+        .achievement-progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e9ecef;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .achievement-progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        .achievement.unlocked .achievement-progress-fill {
+            background: linear-gradient(135deg, #4caf50, #45a049);
+        }
+
+        /* Enhanced Chart Styles */
+        .chart-container {
+            height: 180px;
+            margin: 20px 0;
+            background: #f8f9fa;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #e9ecef;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-container.loaded {
+            border: 1px solid #e9ecef;
+            background: white;
+        }
+
+        .chart-legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-around;
+            font-size: 10px;
+            color: #666;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .legend-color {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
     </style>
 </head>
 <body>
@@ -570,8 +695,24 @@
                     <div class="section-icon">📈</div>
                     Performance Trends
                 </div>
-                <div class="chart-container">
-                    <div>📊 Chart visualization coming soon...</div>
+                <div class="chart-container" id="trend-chart">
+                    <div style="text-align: center; color: #666; padding: 40px;">
+                        <div class="spinner"></div>
+                        <div>Loading trends...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon">📊</div>
+                    Platform Usage
+                </div>
+                <div class="chart-container" id="platform-chart">
+                    <div style="text-align: center; color: #666; padding: 40px;">
+                        <div class="spinner"></div>
+                        <div>Loading platform data...</div>
+                    </div>
                 </div>
             </div>
 
@@ -580,8 +721,21 @@
                     <div class="section-icon">🎯</div>
                     Score Distribution
                 </div>
-                <div class="chart-container">
-                    <div>📈 Score distribution chart coming soon...</div>
+                <div class="chart-container" id="score-chart">
+                    <div style="text-align: center; color: #666; padding: 40px;">
+                        <div class="spinner"></div>
+                        <div>Loading score distribution...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon">🏆</div>
+                    Achievements
+                </div>
+                <div id="achievements-container">
+                    <!-- Achievements will be populated here -->
                 </div>
             </div>
         </div>
@@ -693,6 +847,7 @@
         </div>
     </div>
 
+    <script src="chart.js"></script>
     <script src="popup.js"></script>
 </body>
 </html> 

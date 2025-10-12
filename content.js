@@ -718,6 +718,7 @@ class PromptTracer {
       console.log('Prompt Tracer: init() called');
       if (this.platform === 'unknown') {
         console.log('Prompt Tracer: Platform not supported');
+        this.showPlatformNotSupported();
         return;
       }
 
@@ -734,6 +735,7 @@ class PromptTracer {
     } catch (error) {
       console.error('Prompt Tracer: Initialization failed:', error);
       this.showErrorNotification('Failed to initialize Prompt Tracer. Please refresh the page.');
+      this.reportError('initialization', error);
     }
   }
 
@@ -767,6 +769,9 @@ class PromptTracer {
     
     // Listen for keyboard events to detect when user is typing
     document.addEventListener('keydown', this.handleKeydown.bind(this));
+    
+    // Setup keyboard shortcuts
+    this.setupKeyboardShortcuts();
   }
 
   setupMutationObserver() {
@@ -808,6 +813,193 @@ class PromptTracer {
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
       setTimeout(() => this.findAndCapturePrompt(), 100);
     }
+  }
+
+  setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (event) => {
+      // Only trigger shortcuts if not typing in an input field
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || 
+          event.target.contentEditable === 'true') {
+        return;
+      }
+
+      // Ctrl+Shift+P: Quick prompt analysis
+      if (event.ctrlKey && event.shiftKey && event.key === 'P') {
+        event.preventDefault();
+        this.findAndCapturePrompt();
+        this.showShortcutNotification('🔍 Analyzing current prompt...');
+      }
+
+      // Ctrl+Shift+O: Copy optimized version (if available)
+      if (event.ctrlKey && event.shiftKey && event.key === 'O') {
+        event.preventDefault();
+        this.copyLastOptimizedPrompt();
+      }
+
+      // Ctrl+Shift+D: Open dashboard
+      if (event.ctrlKey && event.shiftKey && event.key === 'D') {
+        event.preventDefault();
+        this.openDashboard();
+      }
+
+      // Ctrl+Shift+H: Show help
+      if (event.ctrlKey && event.shiftKey && event.key === 'H') {
+        event.preventDefault();
+        this.showKeyboardShortcutsHelp();
+      }
+    });
+  }
+
+  showShortcutNotification(message) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      z-index: 1000000;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      max-width: 400px;
+      text-align: center;
+      font-weight: 500;
+    `;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.remove();
+      }
+    }, 3000);
+  }
+
+  copyLastOptimizedPrompt() {
+    // Try to find the last analysis panel
+    const panel = document.getElementById('prompt-tracer-panel');
+    if (panel) {
+      const optimizedText = panel.querySelector('#optimized-text');
+      if (optimizedText) {
+        const text = optimizedText.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          this.showShortcutNotification('✅ Optimized prompt copied to clipboard!');
+        }).catch(() => {
+          this.showShortcutNotification('❌ Failed to copy prompt');
+        });
+        return;
+      }
+    }
+    
+    this.showShortcutNotification('ℹ️ No optimized prompt available. Analyze a prompt first.');
+  }
+
+  openDashboard() {
+    // Open extension popup
+    chrome.runtime.sendMessage({ action: 'openDashboard' });
+    this.showShortcutNotification('📊 Opening dashboard...');
+  }
+
+  showKeyboardShortcutsHelp() {
+    const helpModal = document.createElement('div');
+    helpModal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      position: relative;
+    `;
+
+    modal.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2 style="margin: 0; color: #333; font-size: 24px; font-weight: 600;">⌨️ Keyboard Shortcuts</h2>
+        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background: none; border: none; cursor: pointer; font-size: 24px; color: #666; padding: 4px;">×</button>
+      </div>
+      
+      <div style="space-y: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px;">
+          <div>
+            <div style="font-weight: 600; color: #333;">Quick Analysis</div>
+            <div style="font-size: 14px; color: #666;">Analyze current prompt</div>
+          </div>
+          <kbd style="background: #e9ecef; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl+Shift+P</kbd>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px;">
+          <div>
+            <div style="font-weight: 600; color: #333;">Copy Optimized</div>
+            <div style="font-size: 14px; color: #666;">Copy last optimized prompt</div>
+          </div>
+          <kbd style="background: #e9ecef; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl+Shift+O</kbd>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px;">
+          <div>
+            <div style="font-weight: 600; color: #333;">Open Dashboard</div>
+            <div style="font-size: 14px; color: #666;">View analytics and settings</div>
+          </div>
+          <kbd style="background: #e9ecef; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl+Shift+D</kbd>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px;">
+          <div>
+            <div style="font-weight: 600; color: #333;">Show Help</div>
+            <div style="font-size: 14px; color: #666;">Display this shortcuts guide</div>
+          </div>
+          <kbd style="background: #e9ecef; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl+Shift+H</kbd>
+        </div>
+      </div>
+      
+      <div style="margin-top: 24px; padding: 16px; background: linear-gradient(135deg, #f8f9ff, #e8ecff); border-radius: 8px;">
+        <div style="font-size: 14px; color: #666; text-align: center;">
+          <strong>💡 Pro Tip:</strong> These shortcuts work on any AI platform where Prompt Tracer is active
+        </div>
+      </div>
+    `;
+
+    helpModal.appendChild(modal);
+    document.body.appendChild(helpModal);
+
+    // Close on escape key
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        helpModal.remove();
+        document.removeEventListener('keydown', handleEscape);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    // Auto-close after 10 seconds
+    setTimeout(() => {
+      if (helpModal.parentElement) {
+        helpModal.remove();
+        document.removeEventListener('keydown', handleEscape);
+      }
+    }, 10000);
   }
 
   findAndCapturePrompt() {
@@ -929,8 +1121,9 @@ class PromptTracer {
       console.log('Analysis panel should now be visible with LLM optimization');
     }).catch(error => {
       console.error('Error in LLM optimization flow:', error);
-      // Even on error, don't show rule-based suggestions
-      this.showAnalysis(promptData, analysis, promptText);
+      // Handle optimization error gracefully
+      const fallbackOptimization = this.handleOptimizationError(error, promptText);
+      this.showAnalysis(promptData, analysis, fallbackOptimization);
     });
 
     setTimeout(() => {
@@ -1263,15 +1456,29 @@ class PromptTracer {
     return actions[quality] || actions.developing;
   }
 
-  showErrorNotification(message) {
+  showErrorNotification(message, type = 'error', duration = 5000) {
     try {
+      const colors = {
+        error: '#f44336',
+        warning: '#ff9800',
+        info: '#2196f3',
+        success: '#4caf50'
+      };
+      
+      const icons = {
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️',
+        success: '✅'
+      };
+      
       const notification = document.createElement('div');
       notification.style.cssText = `
         position: fixed;
         top: 20px;
         left: 50%;
         transform: translateX(-50%);
-        background: #f44336;
+        background: ${colors[type] || colors.error};
         color: white;
         padding: 12px 20px;
         border-radius: 8px;
@@ -1281,8 +1488,24 @@ class PromptTracer {
         box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
         max-width: 400px;
         text-align: center;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
       `;
-      notification.textContent = message;
+      
+      notification.innerHTML = `
+        <span style="font-size: 16px;">${icons[type] || icons.error}</span>
+        <span>${message}</span>
+      `;
+      
+      // Add click to dismiss
+      notification.onclick = () => {
+        if (notification.parentElement) {
+          notification.remove();
+        }
+      };
       
       document.body.appendChild(notification);
       
@@ -1290,10 +1513,105 @@ class PromptTracer {
         if (notification.parentElement) {
           notification.remove();
         }
-      }, 5000);
+      }, duration);
     } catch (error) {
       console.error('Failed to show error notification:', error);
     }
+  }
+
+  showPlatformNotSupported() {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #ff9800, #f57c00);
+      color: white;
+      padding: 16px 20px;
+      border-radius: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      z-index: 1000000;
+      box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+      max-width: 350px;
+      cursor: pointer;
+    `;
+    
+    notification.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+        <span style="font-size: 18px;">🚫</span>
+        <strong>Platform Not Supported</strong>
+      </div>
+      <div style="font-size: 13px; opacity: 0.9; line-height: 1.4;">
+        Prompt Tracer works on ChatGPT, Claude, Grok, and Gemini. 
+        <br><strong>Click here</strong> to learn more about supported platforms.
+      </div>
+    `;
+    
+    notification.onclick = () => {
+      window.open('https://github.com/yourusername/prompt_tracer#supported-platforms', '_blank');
+      notification.remove();
+    };
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.remove();
+      }
+    }, 10000);
+  }
+
+  reportError(context, error) {
+    try {
+      // Store error locally for debugging (no external transmission)
+      const errorReport = {
+        timestamp: new Date().toISOString(),
+        context: context,
+        error: error.message || error.toString(),
+        stack: error.stack,
+        platform: this.platform,
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      };
+      
+      chrome.storage.local.get(['errorLogs'], (result) => {
+        const errorLogs = result.errorLogs || [];
+        errorLogs.push(errorReport);
+        
+        // Keep only last 10 errors
+        if (errorLogs.length > 10) {
+          errorLogs.splice(0, errorLogs.length - 10);
+        }
+        
+        chrome.storage.local.set({ errorLogs: errorLogs });
+      });
+    } catch (reportError) {
+      console.error('Failed to report error:', reportError);
+    }
+  }
+
+  handleOptimizationError(error, originalPrompt) {
+    console.error('Optimization error:', error);
+    
+    let errorMessage = 'Failed to optimize prompt. ';
+    let suggestion = 'Try refreshing the page or check your internet connection.';
+    
+    if (error.message.includes('API key')) {
+      errorMessage += 'API key issue. ';
+      suggestion = 'Check your API key in the extension settings.';
+    } else if (error.message.includes('network')) {
+      errorMessage += 'Network error. ';
+      suggestion = 'Check your internet connection and try again.';
+    } else if (error.message.includes('quota')) {
+      errorMessage += 'API quota exceeded. ';
+      suggestion = 'Check your API usage limits or try again later.';
+    }
+    
+    this.showErrorNotification(`${errorMessage}${suggestion}`, 'warning', 8000);
+    
+    // Fallback to rule-based optimization
+    return this.smartFallbackOptimization(originalPrompt, {});
   }
 
   injectUI() {
