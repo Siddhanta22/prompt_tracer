@@ -256,7 +256,13 @@ class PromptOptimizer {
       structure: 0,
       context: 0,
       intent: 0,
-      completeness: 0
+      completeness: 0,
+      creativity: 0,
+      precision: 0,
+      engagement: 0,
+      adaptability: 0,
+      technical_quality: 0,
+      output_potential: 0
     };
     
     const words = promptText.split(' ').filter(word => word.length > 0);
@@ -280,6 +286,14 @@ class PromptOptimizer {
     
     // Completeness Score (0-100)
     metrics.completeness = this.calculateCompletenessScore(promptText, words, sentences);
+    
+    // Enhanced metrics for better analysis
+    metrics.creativity = this.calculateCreativityScore(promptText, words);
+    metrics.precision = this.calculatePrecisionScore(promptText, words);
+    metrics.engagement = this.calculateEngagementScore(promptText, words);
+    metrics.adaptability = this.calculateAdaptabilityScore(promptText, words);
+    metrics.technical_quality = this.calculateTechnicalQualityScore(promptText, words);
+    metrics.output_potential = this.calculateOutputPotentialScore(promptText, words, sentences);
     
     return metrics;
   }
@@ -687,6 +701,243 @@ class PromptOptimizer {
       comparison: "Compare [item A] and [item B] based on [criteria]. Highlight [key differences] and [similarities].",
       recommendation: "Based on [context/situation], recommend [type of solution] that considers [constraints/requirements]."
     };
+  }
+
+  // Enhanced calculation methods for better prompt analysis
+  
+  calculateCreativityScore(text, words) {
+    let score = 30; // Base score
+    
+    // Creative language indicators
+    const creativeWords = [
+      'innovative', 'creative', 'unique', 'original', 'imaginative', 'inspiring',
+      'breakthrough', 'revolutionary', 'cutting-edge', 'state-of-the-art',
+      'novel', 'fresh', 'dynamic', 'vibrant', 'compelling', 'engaging'
+    ];
+    
+    const creativeCount = words.filter(word => 
+      creativeWords.some(creative => word.toLowerCase().includes(creative))
+    ).length;
+    
+    score += Math.min(creativeCount * 8, 40);
+    
+    // Metaphors and analogies
+    const metaphorIndicators = ['like', 'as', 'similar to', 'reminds me of', 'imagine', 'picture'];
+    const metaphorCount = metaphorIndicators.filter(indicator => 
+      text.toLowerCase().includes(indicator)
+    ).length;
+    
+    score += Math.min(metaphorCount * 5, 20);
+    
+    // Questions that spark creativity
+    const creativeQuestions = ['what if', 'how might', 'imagine if', 'suppose', 'consider'];
+    const questionCount = creativeQuestions.filter(question => 
+      text.toLowerCase().includes(question)
+    ).length;
+    
+    score += Math.min(questionCount * 5, 10);
+    
+    return Math.min(score, 100);
+  }
+
+  calculatePrecisionScore(text, words) {
+    let score = 40; // Base score
+    
+    // Specific numbers and measurements
+    const numberPattern = /\d+(\.\d+)?/g;
+    const numbers = text.match(numberPattern);
+    if (numbers) {
+      score += Math.min(numbers.length * 5, 25);
+    }
+    
+    // Specific time references
+    const timeIndicators = ['today', 'yesterday', 'tomorrow', 'this week', 'next month', 'by', 'until', 'before', 'after'];
+    const timeCount = timeIndicators.filter(indicator => 
+      text.toLowerCase().includes(indicator)
+    ).length;
+    
+    score += Math.min(timeCount * 4, 15);
+    
+    // Specific locations and proper nouns
+    const properNounPattern = /[A-Z][a-z]+/g;
+    const properNouns = text.match(properNounPattern);
+    if (properNouns) {
+      score += Math.min(properNouns.length * 2, 10);
+    }
+    
+    // Technical terms and jargon (domain-specific precision)
+    const technicalTerms = ['algorithm', 'methodology', 'framework', 'protocol', 'specification', 'requirement'];
+    const technicalCount = technicalTerms.filter(term => 
+      text.toLowerCase().includes(term)
+    ).length;
+    
+    score += Math.min(technicalCount * 3, 10);
+    
+    return Math.min(score, 100);
+  }
+
+  calculateEngagementScore(text, words) {
+    let score = 35; // Base score
+    
+    // Interactive elements
+    const interactiveWords = ['you', 'your', 'we', 'our', 'let\'s', 'together', 'collaborate'];
+    const interactiveCount = interactiveWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(interactiveCount * 4, 25);
+    
+    // Emotional language
+    const emotionalWords = [
+      'excited', 'thrilled', 'amazing', 'incredible', 'fantastic', 'wonderful',
+      'concerned', 'worried', 'important', 'crucial', 'critical', 'urgent',
+      'love', 'passionate', 'dedicated', 'committed', 'motivated'
+    ];
+    
+    const emotionalCount = words.filter(word => 
+      emotionalWords.some(emotional => word.toLowerCase().includes(emotional))
+    ).length;
+    
+    score += Math.min(emotionalCount * 5, 20);
+    
+    // Action-oriented language
+    const actionWords = ['create', 'build', 'develop', 'implement', 'execute', 'launch', 'achieve', 'accomplish'];
+    const actionCount = actionWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(actionCount * 3, 15);
+    
+    // Questions that engage
+    const questionCount = (text.match(/\?/g) || []).length;
+    score += Math.min(questionCount * 3, 5);
+    
+    return Math.min(score, 100);
+  }
+
+  calculateAdaptabilityScore(text, words) {
+    let score = 30; // Base score
+    
+    // Flexible language
+    const flexibleWords = ['could', 'might', 'possibly', 'perhaps', 'maybe', 'potentially', 'alternatively'];
+    const flexibleCount = flexibleWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(flexibleCount * 5, 25);
+    
+    // Multiple options presented
+    const optionIndicators = ['or', 'either', 'alternatively', 'option 1', 'option 2', 'choice'];
+    const optionCount = optionIndicators.filter(indicator => 
+      text.toLowerCase().includes(indicator)
+    ).length;
+    
+    score += Math.min(optionCount * 4, 20);
+    
+    // Conditional language
+    const conditionalWords = ['if', 'when', 'unless', 'provided that', 'assuming'];
+    const conditionalCount = conditionalWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(conditionalCount * 3, 15);
+    
+    // Scalable language
+    const scalableWords = ['scale', 'expand', 'adjust', 'modify', 'customize', 'adapt'];
+    const scalableCount = scalableWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(scalableCount * 4, 10);
+    
+    return Math.min(score, 100);
+  }
+
+  calculateTechnicalQualityScore(text, words) {
+    let score = 40; // Base score
+    
+    // Technical terminology
+    const technicalTerms = [
+      'algorithm', 'database', 'API', 'framework', 'architecture', 'optimization',
+      'performance', 'scalability', 'security', 'authentication', 'encryption',
+      'integration', 'deployment', 'configuration', 'implementation'
+    ];
+    
+    const technicalCount = technicalTerms.filter(term => 
+      text.toLowerCase().includes(term)
+    ).length;
+    
+    score += Math.min(technicalCount * 4, 30);
+    
+    // Code-related terms
+    const codeTerms = ['function', 'variable', 'class', 'method', 'parameter', 'syntax', 'debug'];
+    const codeCount = codeTerms.filter(term => 
+      text.toLowerCase().includes(term)
+    ).length;
+    
+    score += Math.min(codeCount * 3, 15);
+    
+    // Structured language
+    const structureWords = ['step', 'process', 'procedure', 'workflow', 'sequence', 'order'];
+    const structureCount = structureWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(structureCount * 2, 10);
+    
+    // Problem-solving language
+    const problemSolvingWords = ['analyze', 'diagnose', 'troubleshoot', 'resolve', 'fix', 'debug'];
+    const problemSolvingCount = problemSolvingWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(problemSolvingCount * 3, 5);
+    
+    return Math.min(score, 100);
+  }
+
+  calculateOutputPotentialScore(text, words, sentences) {
+    let score = 35; // Base score
+    
+    // Comprehensive request indicators
+    const comprehensiveWords = ['detailed', 'comprehensive', 'thorough', 'complete', 'extensive', 'in-depth'];
+    const comprehensiveCount = comprehensiveWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(comprehensiveCount * 8, 25);
+    
+    // Output format specification
+    const formatWords = ['format', 'structure', 'template', 'outline', 'list', 'table', 'chart', 'diagram'];
+    const formatCount = formatWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(formatCount * 4, 15);
+    
+    // Quality expectations
+    const qualityWords = ['high-quality', 'professional', 'expert', 'advanced', 'sophisticated', 'polished'];
+    const qualityCount = qualityWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(qualityCount * 5, 15);
+    
+    // Length and depth indicators
+    if (words.length > 50) score += 10;
+    if (sentences.length > 3) score += 5;
+    if (text.includes(':')) score += 5; // Colon indicates structured request
+    if (text.includes('\n')) score += 5; // Line breaks indicate structure
+    
+    // Specificity for better output
+    const specificWords = ['specific', 'exact', 'precise', 'particular', 'detailed'];
+    const specificCount = specificWords.filter(word => 
+      text.toLowerCase().includes(word)
+    ).length;
+    
+    score += Math.min(specificCount * 4, 10);
+    
+    return Math.min(score, 100);
   }
 }
 
