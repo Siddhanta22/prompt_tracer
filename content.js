@@ -552,12 +552,18 @@ class PromptOptimizer {
   }
   
   determineQuality(metrics) {
-    const avgScore = Object.values(metrics).reduce((a, b) => a + b, 0) / Object.keys(metrics).length;
+    // Calculate average score from the core metrics
+    const coreMetrics = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
+    const coreScores = coreMetrics.map(key => metrics[key] || 0);
+    const avgScore = coreScores.reduce((a, b) => a + b, 0) / coreScores.length;
     
-    if (avgScore < 30) return 'basic';
-    if (avgScore < 50) return 'developing';
-    if (avgScore < 70) return 'good';
-    if (avgScore < 85) return 'excellent';
+    // Convert to percentage
+    const percentage = avgScore * 100;
+    
+    if (percentage < 30) return 'basic';
+    if (percentage < 50) return 'developing';
+    if (percentage < 70) return 'good';
+    if (percentage < 85) return 'excellent';
     return 'masterful';
   }
 
@@ -1496,7 +1502,7 @@ class PromptTracer {
     `;
 
     // Get quality level and color
-    const quality = analysis.quality;
+    const quality = analysis.quality || 'developing';
     const qualityConfig = {
       basic: { color: '#f44336', label: 'Basic', icon: '🌱' },
       developing: { color: '#ff9800', label: 'Developing', icon: '🚀' },
