@@ -202,25 +202,52 @@ async function optimizePromptWithLLM(originalPrompt, analysis) {
 
 // Create optimization prompt for LLM
 function createOptimizationPrompt(originalPrompt, analysis) {
-  const issues = analysis.issues.map(issue => `- ${issue.issue}`).join('\n');
-  const score = analysis.score;
+  const metrics = analysis.metrics || {};
+  const issues = analysis.issues ? analysis.issues.map(issue => `- ${issue.issue}`).join('\n') : '';
+  const score = analysis.overallScore || 0;
   
-  return `You are an expert prompt engineer. Please optimize the following prompt to make it more effective and clear.
+  return `You are an expert prompt engineer specializing in AI interaction optimization. Your task is to transform the following prompt into a highly effective, professional-grade prompt that will generate superior AI responses.
 
 ORIGINAL PROMPT:
 "${originalPrompt}"
 
-ANALYSIS:
-- Current Score: ${score}/100
-- Issues Found:
-${issues}
+DETAILED ANALYSIS:
+- Overall Quality Score: ${score}/100
+- Clarity: ${Math.round((metrics.clarity || 0) * 100)}%
+- Specificity: ${Math.round((metrics.specificity || 0) * 100)}%
+- Structure: ${Math.round((metrics.structure || 0) * 100)}%
+- Context: ${Math.round((metrics.context || 0) * 100)}%
+- Intent: ${Math.round((metrics.intent || 0) * 100)}%
+- Completeness: ${Math.round((metrics.completeness || 0) * 100)}%
+- Creativity: ${Math.round((metrics.creativity || 0) * 100)}%
+- Precision: ${Math.round((metrics.precision || 0) * 100)}%
+- Engagement: ${Math.round((metrics.engagement || 0) * 100)}%
 
-TASK: Rewrite this prompt to address the identified issues and make it more effective. The optimized prompt should:
-1. Be clear and specific
-2. Include necessary context and constraints
-3. Specify the desired output format when helpful
-4. Be concise but comprehensive
-5. Maintain the original intent while improving structure
+OPTIMIZATION REQUIREMENTS:
+Transform this prompt into a masterful prompt that excels in ALL these areas:
+
+1. **CLARITY & PRECISION**: Use crystal-clear language with specific, actionable instructions
+2. **COMPREHENSIVE CONTEXT**: Provide rich background information and domain context
+3. **STRUCTURED FORMAT**: Organize with clear sections, bullet points, or numbered steps
+4. **SPECIFIC OUTPUT FORMAT**: Define exactly what format, length, and style you want
+5. **ENGAGING TONE**: Make it compelling and interesting for the AI to respond to
+6. **TECHNICAL EXCELLENCE**: Use precise terminology and professional language
+7. **CREATIVE ELEMENTS**: Include innovative approaches or unique perspectives
+8. **ADAPTABILITY**: Allow for flexibility while maintaining focus
+
+ADVANCED TECHNIQUES TO APPLY:
+- Use role-playing ("Act as a...", "You are a...")
+- Include examples and templates when helpful
+- Specify the audience or expertise level
+- Add constraints and requirements
+- Use progressive disclosure ("First... then... finally...")
+- Include quality criteria ("Ensure that...", "Make sure to...")
+- Add creative constraints ("Think outside the box...", "Consider unconventional approaches...")
+
+OUTPUT FORMAT:
+Provide ONLY the optimized prompt. No explanations, no meta-commentary. The optimized prompt should be significantly better than the original and ready to use immediately.
+
+OPTIMIZED PROMPT:
 
 Return ONLY the optimized prompt, nothing else.`;
 }
@@ -312,11 +339,15 @@ function advancedRuleBasedOptimization(originalPrompt, analysis) {
   
   const lowerPrompt = originalPrompt.toLowerCase();
   let optimized = originalPrompt;
+  const metrics = analysis.metrics || {};
   
   // Analyze prompt intent and context
   const intent = analyzePromptIntent(lowerPrompt);
   const context = analyzePromptContext(lowerPrompt);
   const issues = analysis.issues || [];
+  
+  // Enhanced optimization based on metrics
+  optimized = applyMetricBasedOptimization(optimized, metrics, intent, context);
   
   // Apply context-aware optimizations
   optimized = applyContextOptimizations(optimized, intent, context, issues);
@@ -326,6 +357,15 @@ function advancedRuleBasedOptimization(originalPrompt, analysis) {
   
   // Apply specificity enhancements
   optimized = applySpecificityEnhancements(optimized, intent, context);
+  
+  // Apply creativity and engagement improvements
+  optimized = applyCreativityEnhancements(optimized, metrics);
+  
+  // Apply technical quality improvements
+  optimized = applyTechnicalQualityImprovements(optimized, metrics);
+  
+  // Apply output potential improvements
+  optimized = applyOutputPotentialImprovements(optimized, metrics);
   
   // Ensure we never return the original unchanged
   if (optimized === originalPrompt) {
@@ -656,6 +696,219 @@ async function testApiKey(apiKey) {
     console.error('API key test error:', error);
     return { success: false, error: 'Network error' };
   }
+}
+
+// Enhanced optimization functions for better prompt quality
+
+// Apply metric-based optimization
+function applyMetricBasedOptimization(prompt, metrics, intent, context) {
+  let optimized = prompt;
+  
+  // Improve clarity if score is low
+  if (metrics.clarity < 0.6) {
+    optimized = improveClarity(optimized);
+  }
+  
+  // Improve specificity if score is low
+  if (metrics.specificity < 0.6) {
+    optimized = improveSpecificity(optimized, context);
+  }
+  
+  // Improve structure if score is low
+  if (metrics.structure < 0.6) {
+    optimized = improveStructure(optimized, intent);
+  }
+  
+  // Improve context if score is low
+  if (metrics.context < 0.6) {
+    optimized = improveContext(optimized, context);
+  }
+  
+  // Improve creativity if score is low
+  if (metrics.creativity < 0.5) {
+    optimized = improveCreativity(optimized, intent);
+  }
+  
+  // Improve engagement if score is low
+  if (metrics.engagement < 0.5) {
+    optimized = improveEngagement(optimized);
+  }
+  
+  return optimized;
+}
+
+// Improve prompt clarity
+function improveClarity(prompt) {
+  let improved = prompt;
+  
+  // Add clear action verbs
+  if (!improved.toLowerCase().includes('please') && !improved.toLowerCase().includes('create') && 
+      !improved.toLowerCase().includes('write') && !improved.toLowerCase().includes('generate')) {
+    improved = `Please ${improved.toLowerCase()}`;
+  }
+  
+  // Break down complex sentences
+  if (improved.includes(' and ') && improved.length > 100) {
+    improved = improved.replace(/ and /g, '.\n\nAdditionally, ');
+  }
+  
+  // Add specific instructions
+  if (!improved.includes(':')) {
+    improved = improved.replace(/^(.+?)(\.|$)/, '$1:\n\n');
+  }
+  
+  return improved;
+}
+
+// Improve prompt specificity
+function improveSpecificity(prompt, context) {
+  let improved = prompt;
+  
+  // Add domain-specific context
+  if (context === 'technical' && !improved.toLowerCase().includes('technical')) {
+    improved = `In a technical context, ${improved.toLowerCase()}`;
+  } else if (context === 'business' && !improved.toLowerCase().includes('business')) {
+    improved = `From a business perspective, ${improved.toLowerCase()}`;
+  } else if (context === 'creative' && !improved.toLowerCase().includes('creative')) {
+    improved = `With a creative approach, ${improved.toLowerCase()}`;
+  }
+  
+  // Add specific examples if missing
+  if (!improved.toLowerCase().includes('example') && !improved.toLowerCase().includes('for instance')) {
+    improved += '\n\nPlease provide specific examples to illustrate your points.';
+  }
+  
+  // Add measurable criteria
+  if (!improved.toLowerCase().includes('length') && !improved.toLowerCase().includes('words')) {
+    improved += '\n\nSpecify the desired length and format of the response.';
+  }
+  
+  return improved;
+}
+
+// Improve prompt structure
+function improveStructure(prompt, intent) {
+  let improved = prompt;
+  
+  // Add structured format for complex requests
+  if (intent === 'analysis' || intent === 'comparison') {
+    if (!improved.includes('1.') && !improved.includes('•')) {
+      improved = improved.replace(/^(.+?)(\.|$)/, '$1:\n\n1. \n2. \n3. ');
+    }
+  }
+  
+  // Add clear sections
+  if (improved.length > 150 && !improved.includes('\n\n')) {
+    improved = improved.replace(/([.!?])\s+/g, '$1\n\n');
+  }
+  
+  return improved;
+}
+
+// Improve prompt context
+function improveContext(prompt, context) {
+  let improved = prompt;
+  
+  // Add background information
+  if (context === 'technical' && !improved.toLowerCase().includes('background')) {
+    improved = `Background: Provide relevant technical context.\n\n${improved}`;
+  } else if (context === 'business' && !improved.toLowerCase().includes('background')) {
+    improved = `Background: Consider business implications and market context.\n\n${improved}`;
+  }
+  
+  // Add target audience
+  if (!improved.toLowerCase().includes('audience') && !improved.toLowerCase().includes('reader')) {
+    improved += '\n\nPlease tailor your response for a general audience.';
+  }
+  
+  return improved;
+}
+
+// Improve prompt creativity
+function improveCreativity(prompt, intent) {
+  let improved = prompt;
+  
+  // Add creative constraints
+  if (!improved.toLowerCase().includes('innovative') && !improved.toLowerCase().includes('creative')) {
+    improved = improved.replace(/^(.+?)(\.|$)/, '$1 using innovative and creative approaches.');
+  }
+  
+  // Add brainstorming elements
+  if (intent === 'generation' || intent === 'creation') {
+    improved += '\n\nConsider multiple perspectives and think outside the box.';
+  }
+  
+  return improved;
+}
+
+// Improve prompt engagement
+function improveEngagement(prompt) {
+  let improved = prompt;
+  
+  // Add interactive elements
+  if (!improved.toLowerCase().includes('you') && !improved.toLowerCase().includes('your')) {
+    improved = improved.replace(/^(.+?)(\.|$)/, 'You are an expert in this field. $1');
+  }
+  
+  // Add collaborative tone
+  if (!improved.toLowerCase().includes('together') && !improved.toLowerCase().includes('collaborate')) {
+    improved += '\n\nLet\'s work together to create something exceptional.';
+  }
+  
+  return improved;
+}
+
+// Apply creativity enhancements
+function applyCreativityEnhancements(prompt, metrics) {
+  if (metrics.creativity < 0.6) {
+    return improveCreativity(prompt, 'general');
+  }
+  return prompt;
+}
+
+// Apply technical quality improvements
+function applyTechnicalQualityImprovements(prompt, metrics) {
+  if (metrics.technical_quality < 0.6) {
+    let improved = prompt;
+    
+    // Add technical precision
+    if (!improved.toLowerCase().includes('precise') && !improved.toLowerCase().includes('accurate')) {
+      improved += '\n\nPlease ensure technical accuracy and precision in your response.';
+    }
+    
+    // Add methodology
+    if (!improved.toLowerCase().includes('method') && !improved.toLowerCase().includes('approach')) {
+      improved += '\n\nExplain your methodology and reasoning process.';
+    }
+    
+    return improved;
+  }
+  return prompt;
+}
+
+// Apply output potential improvements
+function applyOutputPotentialImprovements(prompt, metrics) {
+  if (metrics.output_potential < 0.6) {
+    let improved = prompt;
+    
+    // Add comprehensive requirements
+    if (!improved.toLowerCase().includes('comprehensive') && !improved.toLowerCase().includes('thorough')) {
+      improved = improved.replace(/^(.+?)(\.|$)/, '$1 in a comprehensive and thorough manner.');
+    }
+    
+    // Add quality standards
+    if (!improved.toLowerCase().includes('quality') && !improved.toLowerCase().includes('professional')) {
+      improved += '\n\nEnsure high-quality, professional-level output.';
+    }
+    
+    // Add specific deliverables
+    if (!improved.toLowerCase().includes('include') && !improved.toLowerCase().includes('provide')) {
+      improved += '\n\nInclude actionable insights and practical recommendations.';
+    }
+    
+    return improved;
+  }
+  return prompt;
 }
 
 // Update settings
