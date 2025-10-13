@@ -206,50 +206,40 @@ function createOptimizationPrompt(originalPrompt, analysis) {
   const issues = analysis.issues ? analysis.issues.map(issue => `- ${issue.issue}`).join('\n') : '';
   const score = analysis.overallScore || 0;
   
-  return `You are an expert prompt engineer specializing in AI interaction optimization. Your task is to transform the following prompt into a highly effective, professional-grade prompt that will generate superior AI responses.
+  return `You are an expert prompt engineer. Your task is to create a highly effective, contextually appropriate prompt that will generate superior AI responses.
 
 ORIGINAL PROMPT:
 "${originalPrompt}"
 
-DETAILED ANALYSIS:
-- Overall Quality Score: ${score}/100
-- Clarity: ${Math.round((metrics.clarity || 0) * 100)}%
-- Specificity: ${Math.round((metrics.specificity || 0) * 100)}%
-- Structure: ${Math.round((metrics.structure || 0) * 100)}%
-- Context: ${Math.round((metrics.context || 0) * 100)}%
-- Intent: ${Math.round((metrics.intent || 0) * 100)}%
-- Completeness: ${Math.round((metrics.completeness || 0) * 100)}%
-- Creativity: ${Math.round((metrics.creativity || 0) * 100)}%
-- Precision: ${Math.round((metrics.precision || 0) * 100)}%
-- Engagement: ${Math.round((metrics.engagement || 0) * 100)}%
+ANALYSIS:
+- Quality Score: ${score}/100
+- Key Areas for Improvement: Clarity, Specificity, Structure, Context
 
-OPTIMIZATION REQUIREMENTS:
-Transform this prompt into a masterful prompt that excels in ALL these areas:
+INSTRUCTIONS:
+Analyze the ORIGINAL PROMPT and create an optimized version that is:
+1. **CONTEXTUALLY APPROPRIATE**: Match the tone and purpose of the original request
+2. **SPECIFIC TO THE TOPIC**: Don't use generic templates - tailor to the actual subject matter
+3. **NATURALLY ENHANCED**: Improve clarity and specificity while maintaining the original intent
+4. **TOPIC-AWARE**: Use appropriate language and structure for the specific domain
 
-1. **CLARITY & PRECISION**: Use crystal-clear language with specific, actionable instructions
-2. **COMPREHENSIVE CONTEXT**: Provide rich background information and domain context
-3. **STRUCTURED FORMAT**: Organize with clear sections, bullet points, or numbered steps
-4. **SPECIFIC OUTPUT FORMAT**: Define exactly what format, length, and style you want
-5. **ENGAGING TONE**: Make it compelling and interesting for the AI to respond to
-6. **TECHNICAL EXCELLENCE**: Use precise terminology and professional language
-7. **CREATIVE ELEMENTS**: Include innovative approaches or unique perspectives
-8. **ADAPTABILITY**: Allow for flexibility while maintaining focus
+EXAMPLES OF GOOD OPTIMIZATION:
 
-ADVANCED TECHNIQUES TO APPLY:
-- Use role-playing ("Act as a...", "You are a...")
-- Include examples and templates when helpful
-- Specify the audience or expertise level
-- Add constraints and requirements
-- Use progressive disclosure ("First... then... finally...")
-- Include quality criteria ("Ensure that...", "Make sure to...")
-- Add creative constraints ("Think outside the box...", "Consider unconventional approaches...")
+If original is about travel: "Give me beach trip ideas"
+→ Optimize to: "I'm planning a beach vacation and need destination recommendations. Please suggest 5-7 beautiful beach destinations with details about: best time to visit, activities available, accommodation options, and travel tips. Include both popular and hidden gem locations."
 
-OUTPUT FORMAT:
-Provide ONLY the optimized prompt. No explanations, no meta-commentary. The optimized prompt should be significantly better than the original and ready to use immediately.
+If original is about learning: "Explain machine learning"  
+→ Optimize to: "Please explain machine learning in simple terms. Include: what it is, how it works with examples, real-world applications, and why it's important. Make it accessible for someone new to the topic."
 
-OPTIMIZED PROMPT:
+If original is about creative projects: "Give me movie ideas"
+→ Optimize to: "I need creative movie plot ideas for [genre/setting]. Please provide 3-5 unique concepts with: basic premise, main characters, key conflict, and what makes each story compelling. Avoid clichés and think creatively."
 
-Return ONLY the optimized prompt, nothing else.`;
+CRITICAL: 
+- DO NOT use generic templates like "common challenges" or "step-by-step guidance" for inappropriate topics
+- DO NOT add business/technical frameworks to creative or personal requests
+- DO make the prompt more specific and engaging while respecting the original intent
+- DO use appropriate language for the topic (casual for travel, technical for science, creative for art, etc.)
+
+Provide ONLY the optimized prompt that's perfectly tailored to the original request:`;
 }
 
 // Call OpenAI API
@@ -546,6 +536,14 @@ function analyzePromptContext(lowerPrompt) {
   } else if (lowerPrompt.includes('academic') || lowerPrompt.includes('research') || lowerPrompt.includes('study')) {
     context.domain = 'academic';
     context.tone = 'formal';
+  } else if (lowerPrompt.includes('trip') || lowerPrompt.includes('travel') || lowerPrompt.includes('vacation') || 
+             lowerPrompt.includes('beach') || lowerPrompt.includes('destination') || lowerPrompt.includes('hotel') ||
+             lowerPrompt.includes('flight') || lowerPrompt.includes('visit') || lowerPrompt.includes('tourist')) {
+    context.domain = 'travel';
+    context.tone = 'casual';
+  } else if (lowerPrompt.includes('movie') || lowerPrompt.includes('film') || lowerPrompt.includes('cinema')) {
+    context.domain = 'entertainment';
+    context.tone = 'casual';
   }
   
   // Detect audience
@@ -571,6 +569,10 @@ function applyContextOptimizations(prompt, intent, context, issues) {
     optimized = addTechnicalContext(optimized);
   } else if (context.domain === 'academic') {
     optimized = addAcademicContext(optimized);
+  } else if (context.domain === 'travel') {
+    optimized = addTravelContext(optimized);
+  } else if (context.domain === 'entertainment') {
+    optimized = addEntertainmentContext(optimized);
   }
   
   // Add intent-specific improvements
@@ -591,13 +593,18 @@ function applyContextOptimizations(prompt, intent, context, issues) {
 function applyStructureImprovements(prompt, intent, context) {
   let optimized = prompt;
   
-  // Add structure based on intent
+  // Add structure based on intent and context - be context-aware
   if (intent.type === 'comparison') {
     optimized += '\n\nPlease provide a structured comparison including:\n- Key differences\n- Similarities\n- Pros and cons\n- Recommendations';
   } else if (intent.type === 'instruction') {
     optimized += '\n\nPlease provide step-by-step instructions including:\n- Prerequisites\n- Detailed steps\n- Tips and warnings\n- Expected outcomes';
   } else if (intent.type === 'analysis') {
     optimized += '\n\nPlease provide a comprehensive analysis including:\n- Key factors\n- Evidence and examples\n- Implications\n- Recommendations';
+  }
+  
+  // Don't add generic business/technical structure to travel/entertainment prompts
+  if (context.domain !== 'travel' && context.domain !== 'entertainment' && intent.type === 'explanation' && optimized.length < 200) {
+    optimized += '\n\nPlease provide a clear explanation with examples and practical applications.';
   }
   
   return optimized;
@@ -649,6 +656,39 @@ function addTechnicalContext(prompt) {
 
 function addAcademicContext(prompt) {
   return prompt + '\n\nPlease provide a well-researched response with citations, evidence, and academic rigor.';
+}
+
+function addTravelContext(prompt) {
+  // For travel prompts, make them more specific and practical
+  if (prompt.toLowerCase().includes('idea') || prompt.toLowerCase().includes('suggest')) {
+    return `I'm looking for travel recommendations. ${prompt.replace(/give me|ideas for|suggest/i, '').trim()} Please provide:
+
+• **Destination suggestions** with specific locations
+• **Best time to visit** and seasonal considerations  
+• **Activities and attractions** to enjoy
+• **Accommodation options** (budget-friendly to luxury)
+• **Travel tips** and local insights
+• **Budget estimates** if possible
+
+Make it practical and inspiring for planning a memorable trip!`;
+  }
+  return prompt + '\n\nPlease provide practical travel advice with specific recommendations, timing, and helpful tips for planning.';
+}
+
+function addEntertainmentContext(prompt) {
+  // For entertainment prompts, make them creative and engaging
+  if (prompt.toLowerCase().includes('idea') || prompt.toLowerCase().includes('suggest')) {
+    return `I'm looking for entertainment recommendations. ${prompt.replace(/give me|ideas for|suggest/i, '').trim()} Please suggest:
+
+• **Specific recommendations** with titles and brief descriptions
+• **Why these are worth watching/reading/playing**
+• **Different options** for various moods or preferences
+• **Where to find them** (streaming platforms, etc.)
+• **Similar recommendations** if I enjoy these
+
+Make it engaging and help me discover something amazing!`;
+  }
+  return prompt + '\n\nPlease provide engaging entertainment recommendations with creative suggestions and helpful details.';
 }
 
 function addCreationContext(prompt, context) {
