@@ -1400,6 +1400,11 @@ class PromptTracer {
       // Store the prompt data
       this.storePromptData(promptData);
       
+      // Ensure analysis has proper quality before showing
+      if (!analysis.quality) {
+        analysis.quality = this.optimizer.determineQuality(analysis.metrics || {});
+      }
+      
       // Show analysis in UI with LLM optimization
       this.showAnalysis(promptData, analysis, optimizedPrompt);
       console.log('Analysis panel should now be visible with LLM optimization');
@@ -1409,6 +1414,12 @@ class PromptTracer {
       const fallbackOptimization = this.optimizer.optimizePrompt(promptText, analysis);
       promptData.setOptimizedVersion(fallbackOptimization);
       this.storePromptData(promptData);
+      
+      // Ensure analysis has proper quality before showing
+      if (!analysis.quality) {
+        analysis.quality = this.optimizer.determineQuality(analysis.metrics || {});
+      }
+      
       this.showAnalysis(promptData, analysis, fallbackOptimization);
     });
 
