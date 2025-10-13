@@ -703,6 +703,33 @@ class PromptOptimizer {
     };
   }
 
+  // Simple rule-based optimization for fallback
+  optimizePrompt(promptText, analysis) {
+    let optimized = promptText;
+    
+    // Basic improvements
+    if (!optimized.toLowerCase().startsWith('please')) {
+      optimized = 'Please ' + optimized.toLowerCase();
+    }
+    
+    // Add specificity if missing
+    if (optimized.length < 50) {
+      optimized += '\n\nPlease provide specific examples and detailed explanations.';
+    }
+    
+    // Add structure if missing
+    if (!optimized.includes(':') && optimized.length > 100) {
+      optimized = optimized.replace(/^(.+?)(\.|$)/, '$1:\n\n');
+    }
+    
+    // Ensure it's different from original
+    if (optimized === promptText) {
+      optimized = 'Please provide a comprehensive response about: ' + promptText.toLowerCase();
+    }
+    
+    return optimized;
+  }
+
   // Enhanced calculation methods for better prompt analysis
   
   calculateCreativityScore(text, words) {
@@ -1359,7 +1386,7 @@ class PromptTracer {
     const promptData = new PromptData(promptText, this.platform);
     const analysis = this.optimizer.analyzePrompt(promptText);
     
-    // ALWAYS use LLM optimization, never rule-based
+    // Try LLM optimization first, fallback to rule-based
     this.getLLMOptimizedPrompt(promptText, analysis).then(optimizedPrompt => {
       console.log('Got LLM optimized prompt, showing analysis panel...');
       promptData.setOptimizedVersion(optimizedPrompt);
@@ -1367,13 +1394,15 @@ class PromptTracer {
       // Store the prompt data
       this.storePromptData(promptData);
       
-      // Show analysis in UI with ONLY LLM optimization
+      // Show analysis in UI with LLM optimization
       this.showAnalysis(promptData, analysis, optimizedPrompt);
       console.log('Analysis panel should now be visible with LLM optimization');
     }).catch(error => {
       console.error('Error in LLM optimization flow:', error);
-      // Handle optimization error gracefully
-      const fallbackOptimization = this.handleOptimizationError(error, promptText);
+      // Use rule-based optimization as fallback
+      const fallbackOptimization = this.optimizer.optimizePrompt(promptText, analysis);
+      promptData.setOptimizedVersion(fallbackOptimization);
+      this.storePromptData(promptData);
       this.showAnalysis(promptData, analysis, fallbackOptimization);
     });
 
