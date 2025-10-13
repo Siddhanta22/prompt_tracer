@@ -1384,7 +1384,8 @@ class PromptTracer {
   }
 
   capturePrompt(promptText) {
-    if (!promptText || this.isCapturing) return;
+    // Don't analyze empty or very short prompts
+    if (!promptText || promptText.trim().length < 3 || this.isCapturing) return;
 
     this.isCapturing = true;
     console.log('Prompt Tracer: Capturing prompt:', promptText.substring(0, 50) + '...');
@@ -1486,6 +1487,11 @@ class PromptTracer {
   }
 
   showAnalysis(promptData, analysis, llmOptimizedPrompt = null) {
+    // Don't show analysis for empty or very short prompts
+    if (!promptData.prompt || promptData.prompt.trim().length < 3) {
+      return;
+    }
+
     // Remove existing panel
     const existingPanel = document.getElementById('prompt-tracer-panel');
     if (existingPanel) {
@@ -2011,11 +2017,24 @@ class PromptTracer {
       const element = document.querySelector(selector);
       if (element) {
         const currentValue = element.value || element.textContent || '';
-        if (currentValue.trim() && currentValue !== this.lastMonitoredValue) {
-          this.lastMonitoredValue = currentValue;
-          console.log('Auto-detected prompt change:', currentValue.substring(0, 50) + '...');
-          this.capturePrompt(currentValue.trim());
+        const trimmedValue = currentValue.trim();
+        
+        // Only analyze if there's meaningful content (more than 3 characters)
+        if (trimmedValue.length >= 3 && trimmedValue !== this.lastMonitoredValue) {
+          this.lastMonitoredValue = trimmedValue;
+          console.log('Auto-detected prompt change:', trimmedValue.substring(0, 50) + '...');
+          this.capturePrompt(trimmedValue);
           break;
+        }
+        
+        // If field is empty, clear the last monitored value
+        if (trimmedValue.length === 0 && this.lastMonitoredValue) {
+          this.lastMonitoredValue = '';
+          // Hide analysis panel if it exists
+          const existingPanel = document.getElementById('prompt-tracer-panel');
+          if (existingPanel) {
+            existingPanel.remove();
+          }
         }
       }
     }
