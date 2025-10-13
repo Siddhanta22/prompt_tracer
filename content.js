@@ -1689,12 +1689,18 @@ class PromptTracer {
       structure: { icon: '📋', label: 'Structure', color: '#ff9800' },
       context: { icon: '🌍', label: 'Context', color: '#9c27b0' },
       intent: { icon: '🎯', label: 'Intent', color: '#f44336' },
-      completeness: { icon: '✅', label: 'Completeness', color: '#00bcd4' }
+      completeness: { icon: '✅', label: 'Completeness', color: '#00bcd4' },
+      creativity: { icon: '🎨', label: 'Creativity', color: '#e91e63' },
+      precision: { icon: '⚡', label: 'Precision', color: '#795548' },
+      engagement: { icon: '💫', label: 'Engagement', color: '#607d8b' },
+      adaptability: { icon: '🔄', label: 'Adaptability', color: '#3f51b5' },
+      technical_quality: { icon: '⚙️', label: 'Technical Quality', color: '#009688' },
+      output_potential: { icon: '🚀', label: 'Output Potential', color: '#ff5722' }
     };
 
     return Object.entries(metrics).map(([key, value]) => {
-      const config = metricConfigs[key];
-      const percentage = Math.round(value);
+      const config = metricConfigs[key] || { icon: '📊', label: key.charAt(0).toUpperCase() + key.slice(1), color: '#666666' };
+      const percentage = Math.round(value * 100);
       const color = percentage >= 70 ? '#4caf50' : percentage >= 50 ? '#ff9800' : '#f44336';
       
       return `
