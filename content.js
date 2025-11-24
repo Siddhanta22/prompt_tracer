@@ -553,12 +553,11 @@ class PromptOptimizer {
   
   determineQuality(metrics) {
     // Calculate average score from the core metrics
+    // Metrics are already in 0-100 range, so no need to multiply
     const coreMetrics = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
-    const coreScores = coreMetrics.map(key => metrics[key] || 0);
+    const coreScores = coreMetrics.map(key => Math.max(0, Math.min(100, metrics[key] || 0)));
     const avgScore = coreScores.reduce((a, b) => a + b, 0) / coreScores.length;
-    
-    // Convert to percentage
-    const percentage = avgScore * 100;
+    const percentage = Math.max(0, Math.min(100, avgScore)); // Clamp to 0-100
     
     if (percentage < 30) return 'basic';
     if (percentage < 50) return 'developing';
@@ -1493,13 +1492,20 @@ class PromptTracer {
     }
 
     // Calculate overall quality score (0-100)
+    // Metrics are already in 0-100 range, so no need to multiply
     const metrics = analysis.metrics || {};
     const coreMetrics = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
-    const coreScores = coreMetrics.map(key => (metrics[key] || 0) * 100);
+    const coreScores = coreMetrics.map(key => Math.max(0, Math.min(100, metrics[key] || 0))); // Ensure 0-100 range
     const overallScore = Math.round(coreScores.reduce((a, b) => a + b, 0) / coreScores.length);
+    const clampedScore = Math.max(0, Math.min(100, overallScore)); // Final clamp to ensure 0-100
     
-    // Get quality level and color based on score
-    const quality = analysis.quality || 'developing';
+    // Determine quality level based on actual score (not just analysis.quality)
+    let quality = 'developing';
+    if (clampedScore < 30) quality = 'basic';
+    else if (clampedScore < 50) quality = 'developing';
+    else if (clampedScore < 70) quality = 'good';
+    else if (clampedScore < 85) quality = 'excellent';
+    else quality = 'masterful';
     const qualityConfig = {
       basic: { color: '#f44336', label: 'Basic', icon: '🌱', min: 0, max: 30 },
       developing: { color: '#ff9800', label: 'Developing', icon: '🚀', min: 30, max: 50 },
@@ -1573,9 +1579,9 @@ class PromptTracer {
         <!-- Single Quality Score Display -->
         <div style="text-align: center;">
           <div style="position: relative; display: inline-block;">
-            <div style="width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(from 0deg, ${config.color} 0% ${overallScore}%, #e0e0e0 ${overallScore}% 100%); display: flex; align-items: center; justify-content: center; position: relative;">
+            <div style="width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(from 0deg, ${config.color} 0% ${clampedScore}%, #e0e0e0 ${clampedScore}% 100%); display: flex; align-items: center; justify-content: center; position: relative;">
               <div style="width: 90px; height: 90px; border-radius: 50%; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <div style="font-size: 32px; font-weight: 800; color: ${config.color}; line-height: 1;">${overallScore}</div>
+                <div style="font-size: 32px; font-weight: 800; color: ${config.color}; line-height: 1;">${clampedScore}</div>
                 <div style="font-size: 11px; color: #999; font-weight: 600; margin-top: -4px;">/ 100</div>
               </div>
             </div>
@@ -2115,14 +2121,21 @@ class PromptTracer {
   updatePanelInRealTime(promptText, analysis) {
     if (!this.currentPanel) return;
     
-    // Calculate overall quality score
+    // Calculate overall quality score (metrics are already 0-100)
     const metrics = analysis.metrics || {};
     const coreMetrics = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
-    const coreScores = coreMetrics.map(key => (metrics[key] || 0) * 100);
+    const coreScores = coreMetrics.map(key => Math.max(0, Math.min(100, metrics[key] || 0))); // Ensure 0-100 range
     const overallScore = Math.round(coreScores.reduce((a, b) => a + b, 0) / coreScores.length);
+    const clampedScore = Math.max(0, Math.min(100, overallScore)); // Final clamp to ensure 0-100
     
-    // Get quality level
-    const quality = analysis.quality || 'developing';
+    // Determine quality level based on actual score
+    let quality = 'developing';
+    if (clampedScore < 30) quality = 'basic';
+    else if (clampedScore < 50) quality = 'developing';
+    else if (clampedScore < 70) quality = 'good';
+    else if (clampedScore < 85) quality = 'excellent';
+    else quality = 'masterful';
+    
     const qualityConfig = {
       basic: { color: '#f44336', label: 'Basic', icon: '🌱' },
       developing: { color: '#ff9800', label: 'Developing', icon: '🚀' },
@@ -2136,13 +2149,13 @@ class PromptTracer {
     // Update the score circle
     const scoreCircle = this.currentPanel.querySelector('[style*="conic-gradient"]');
     if (scoreCircle) {
-      scoreCircle.style.background = `conic-gradient(from 0deg, ${config.color} 0% ${overallScore}%, #e0e0e0 ${overallScore}% 100%)`;
+      scoreCircle.style.background = `conic-gradient(from 0deg, ${config.color} 0% ${clampedScore}%, #e0e0e0 ${clampedScore}% 100%)`;
     }
     
     // Update the score number
     const scoreNumber = this.currentPanel.querySelector('[style*="font-size: 32px"]');
     if (scoreNumber) {
-      scoreNumber.textContent = overallScore;
+      scoreNumber.textContent = clampedScore;
       scoreNumber.style.color = config.color;
     }
     
