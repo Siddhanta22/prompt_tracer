@@ -16,16 +16,16 @@
 ## ✨ Features
 
 ### 🎯 **Real-time Prompt Analysis**
-- **Dynamic Scoring**: 6 comprehensive metrics (Clarity, Specificity, Structure, Context, Intent, Completeness)
-- **Quality Levels**: From Basic to Masterful with meaningful feedback
-- **Instant Feedback**: Get analysis as you type
-- **Cross-platform**: Works on ChatGPT, Claude, Grok, and Gemini
+- **Contextual Feedback**: Get instant, actionable feedback on the top 2 most critical issues
+- **AI-Powered Insights**: Optional OpenAI integration for intelligent, context-aware suggestions
+- **Instant Analysis**: Feedback appears as you type, no waiting required
+- **Cross-platform**: Works seamlessly on ChatGPT, Claude, Grok, and Gemini
 
 ### 🚀 **Smart Optimization**
-- **Advanced Rule-based**: Privacy-safe optimization using intelligent rules
-- **Optional AI Enhancement**: Use your own API keys for premium features
-- **Ready-to-Use**: Copy optimized prompts instantly
-- **Educational**: Learn why suggestions work
+- **Instant Rule-based**: Privacy-safe optimization that works immediately, no API key required
+- **AI-Powered Enhancement**: Optional OpenAI API integration for context-aware, natural optimizations
+- **Ready-to-Use**: Copy optimized prompts instantly with one click
+- **Context-Aware**: Understands travel, learning, creative, and technical prompts for better suggestions
 
 ### 📊 **Advanced Analytics Dashboard**
 - **Visual Charts**: Performance trends, platform usage, and score distribution
@@ -50,10 +50,10 @@
 
 New users get a guided 2-minute tutorial that covers:
 - How the extension works
-- Understanding metrics and quality levels
+- Understanding real-time feedback
 - Using the floating analysis panel
 - Tracking progress in the dashboard
-- Customizing settings
+- Setting up OpenAI API key (optional)
 
 Access the tutorial anytime from the extension popup!
 
@@ -85,22 +85,22 @@ cd prompt_tracer
 4. **Copy the optimized version** for better results
 5. **Use keyboard shortcuts** for power user features
 
-## 📊 Understanding Your Metrics
+## 💡 How It Works
 
-### **Quality Levels**
-- **🌱 Basic**: Needs more structure and detail
-- **🚀 Developing**: Good foundation, ready for enhancement  
-- **✨ Good**: Well-crafted with room for improvement
-- **🌟 Excellent**: Strong prompt engineering skills
-- **👑 Masterful**: Exceptional prompt design
+### **Real-time Feedback**
+The extension analyzes your prompt as you type and provides:
+- **Top 2 Critical Issues**: Focus on what matters most
+- **Actionable Suggestions**: Specific, contextual advice to improve your prompt
+- **Instant Optimization**: See an improved version immediately
 
-### **Performance Metrics**
-- **🎯 Clarity**: How clear and readable your prompt is
-- **📊 Specificity**: How specific and detailed your request is
-- **📋 Structure**: How well-organized your prompt is
-- **🌍 Context**: How much context and domain information you provide
-- **🎯 Intent**: How clear your action/request is
-- **✅ Completeness**: How complete and comprehensive your prompt is
+### **Feedback Types**
+- **🔴 Error**: Critical issues that severely limit prompt effectiveness
+- **🟠 Warning**: Important issues that reduce prompt quality
+- **🔵 Info**: Helpful suggestions that would enhance the prompt
+
+### **Optimization Methods**
+- **Rule-based (Default)**: Fast, privacy-safe optimization using intelligent rules
+- **AI-powered (Optional)**: Context-aware optimization using OpenAI API for natural, tailored suggestions
 
 ## ⌨️ Keyboard Shortcuts
 
@@ -113,20 +113,18 @@ cd prompt_tracer
 
 *These shortcuts work on any supported AI platform when Prompt Tracer is active.*
 
-## 📝 Advanced Templates
+## 🎯 Context-Aware Optimization
 
-### **8 Professional Categories**
-- **🎨 Creative**: Stories, poems, scripts, and creative content
-- **💼 Business**: Emails, presentations, reports, and business content  
-- **💻 Technical**: Programming, debugging, technical explanations
-- **📚 Academic**: Essays, research, analysis, and educational content
-- **🏠 Personal**: Personal advice, life planning, and self-improvement
-- **📢 Marketing**: Copywriting, ads, social media, and promotional content
-- **🔍 Analysis**: Data analysis, market research, and investigative content
-- **💬 Communication**: Conversations, negotiations, and interpersonal skills
+The extension intelligently understands different prompt types and provides tailored optimization:
 
-### **Smart Template Suggestions**
-The extension automatically suggests relevant templates based on your prompt content, making it easier to find the perfect template for your needs.
+- **✈️ Travel Prompts**: Destination recommendations, trip planning, travel tips
+- **📚 Learning Prompts**: Explanations, tutorials, educational content
+- **🎨 Creative Prompts**: Stories, ideas, creative projects
+- **💼 Business Prompts**: Professional communication, analysis, reports
+- **💻 Technical Prompts**: Programming, debugging, technical explanations
+- **🔍 Analysis Prompts**: Research, comparisons, investigations
+
+Each context receives specialized optimization that avoids generic templates and provides natural, relevant improvements.
 
 ## 📊 Analytics Dashboard
 
@@ -310,8 +308,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🚀 Production Ready
 
 Prompt Tracer v1.0.0 is production-ready with:
+- ✅ **Real-time Contextual Feedback** with AI-powered insights
 - ✅ **Professional Analytics Dashboard** with visual charts
-- ✅ **Advanced Prompt Templates** (8 categories, 24+ templates)
+- ✅ **Context-Aware Optimization** for different prompt types
 - ✅ **Keyboard Shortcuts** for power users
 - ✅ **Achievement System** with progress tracking
 - ✅ **Comprehensive Error Handling** with graceful fallbacks
