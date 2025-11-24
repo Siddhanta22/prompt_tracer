@@ -48,4 +48,4 @@ temp/
 
 # Test files
 test.html
-debug-*.js 
+debug-*.js .env

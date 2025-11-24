@@ -33,11 +33,6 @@
 - **Performance Insights**: Comprehensive analytics with visual representations
 - **Export Data**: Download your prompt history anytime
 
-### 📝 **Advanced Prompt Templates**
-- **8 Categories**: Creative, Business, Technical, Academic, Personal, Marketing, Analysis, Communication
-- **24+ Templates**: Professional templates for common use cases
-- **Smart Suggestions**: Context-aware template recommendations
-- **Variable System**: Dynamic template generation with user input
 
 ### ⌨️ **Power User Features**
 - **Keyboard Shortcuts**: `Ctrl+Shift+P/O/D/H` for quick access
@@ -167,11 +162,11 @@ prompt_tracer/
 ├── popup.js                  # Popup functionality
 ├── interactive-tutorial.js   # Interactive onboarding
 ├── chart.js                  # Custom analytics charting library
-├── prompt-templates.js       # Advanced template management
-├── icons/                    # Extension assets
+├── icons/                    # Extension icons (16px, 48px, 128px, SVG)
 ├── PRIVACY_POLICY.md         # Privacy policy documentation
 ├── STORE_LISTING.md          # Chrome Web Store materials
-└── PRODUCTION_CHECKLIST.md   # Production readiness guide
+├── PRODUCTION_CHECKLIST.md   # Production readiness guide
+└── SETUP_GUIDE.md            # Setup and installation guide
 ```
 
 ### **Key Classes**
@@ -180,7 +175,6 @@ prompt_tracer/
 - **InteractiveTutorial**: User onboarding system
 - **PromptData**: Data structure for prompts and metrics
 - **PromptTracerCharts**: Custom SVG-based charting library
-- **PromptTemplateManager**: Advanced template categorization system
 
 ### **Platform Support**
 - ✅ **ChatGPT** (chat.openai.com)
