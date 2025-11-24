@@ -302,94 +302,85 @@ Create an optimized version of "${originalPrompt}" that:
 Return ONLY the optimized prompt text, nothing else. No explanations, no meta-commentary, just the prompt itself.`;
 }
 
-// Call OpenAI API
+// Call OpenAI API with timeout
 async function callOpenAI(prompt, apiKey) {
   console.log('Calling OpenAI API with prompt:', prompt.substring(0, 100) + '...');
   
   try {
-    // Try GPT-4 Turbo first for better quality, fallback to GPT-3.5 Turbo
-    const models = ['gpt-4-turbo-preview', 'gpt-4', 'gpt-3.5-turbo'];
-    let lastError = null;
+    // Use GPT-3.5-turbo for speed (faster than GPT-4)
+    const model = 'gpt-3.5-turbo';
     
-    for (const model of models) {
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-            model: model,
-        messages: [
-          {
-            role: 'system',
-                content: 'You are an expert prompt engineer. Your ONLY job is to return the optimized prompt text. Do NOT include explanations, meta-commentary, or any text other than the optimized prompt itself. Return ONLY the prompt.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-            max_tokens: 500,
-            temperature: 0.3, // Lower temperature for more consistent, focused results
-            top_p: 0.9,
-            frequency_penalty: 0.2, // Slight penalty to avoid repetition
-            presence_penalty: 0.1
-      })
-    });
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 second timeout
     
-        console.log(`OpenAI API response status (${model}):`, response.status);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-          console.error(`OpenAI API error response (${model}):`, errorText);
-          
-          // If it's a model not found error, try next model
-          if (response.status === 404 || errorText.includes('model') || errorText.includes('not found')) {
-            lastError = new Error(`Model ${model} not available`);
-            continue; // Try next model
-          }
-          
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-    }
-    
-    const data = await response.json();
-        console.log(`OpenAI API response data (${model}):`, data);
-    
-    if (data.choices && data.choices[0] && data.choices[0].message) {
-          let optimizedPrompt = data.choices[0].message.content.trim();
-          
-          // Clean up the response - remove any meta-commentary or explanations
-          // Sometimes GPT adds explanations even when told not to
-          optimizedPrompt = optimizedPrompt
-            .replace(/^(Here's|Here is|This is|The optimized prompt is|Optimized prompt:|Optimized version:)\s*/i, '')
-            .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-            .trim();
-          
-          // If the response still looks like it contains explanations, try to extract just the prompt
-          if (optimizedPrompt.includes('ORIGINAL PROMPT:') || optimizedPrompt.includes('Optimized:')) {
-            // Try to extract the actual prompt part
-            const promptMatch = optimizedPrompt.match(/(?:Optimized|Optimized prompt|Here's the optimized prompt)[:\s]*(.+)/is);
-            if (promptMatch) {
-              optimizedPrompt = promptMatch[1].trim();
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert prompt engineer. Your ONLY job is to return the optimized prompt text. Do NOT include explanations, meta-commentary, or any text other than the optimized prompt itself. Return ONLY the prompt.'
+            },
+            {
+              role: 'user',
+              content: prompt
             }
-          }
-          
-          console.log(`OpenAI optimized prompt (${model}):`, optimizedPrompt);
-      return optimizedPrompt;
-    } else {
-      throw new Error('Invalid response format from OpenAI API');
-    }
-      } catch (error) {
-        console.log(`Failed with model ${model}, trying next...`, error.message);
-        lastError = error;
-        continue; // Try next model
-      }
-    }
+          ],
+          max_tokens: 300, // Reduced for faster response
+          temperature: 0.3,
+          top_p: 0.9
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
     
-    // If all models failed, throw the last error
-    throw lastError || new Error('All OpenAI models failed');
+      console.log(`OpenAI API response status:`, response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`OpenAI API error response:`, errorText);
+        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log(`OpenAI API response data:`, data);
+      
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        let optimizedPrompt = data.choices[0].message.content.trim();
+        
+        // Clean up the response - remove any meta-commentary or explanations
+        optimizedPrompt = optimizedPrompt
+          .replace(/^(Here's|Here is|This is|The optimized prompt is|Optimized prompt:|Optimized version:)\s*/i, '')
+          .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+          .trim();
+        
+        // If the response still looks like it contains explanations, try to extract just the prompt
+        if (optimizedPrompt.includes('ORIGINAL PROMPT:') || optimizedPrompt.includes('Optimized:')) {
+          const promptMatch = optimizedPrompt.match(/(?:Optimized|Optimized prompt|Here's the optimized prompt)[:\s]*(.+)/is);
+          if (promptMatch) {
+            optimizedPrompt = promptMatch[1].trim();
+          }
+        }
+        
+        console.log(`OpenAI optimized prompt:`, optimizedPrompt);
+        return optimizedPrompt;
+      } else {
+        throw new Error('Invalid response format from OpenAI API');
+      }
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout - API took too long to respond');
+      }
+      throw error;
   } catch (error) {
     console.error('OpenAI API call failed:', error);
     throw error;

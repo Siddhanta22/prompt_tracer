@@ -1398,23 +1398,38 @@ class PromptTracer {
     }
     this.showAnalysis(promptData, analysis, null); // Show panel immediately, optimize in background
     
-    // Try LLM optimization in background, update panel when ready
-    this.getLLMOptimizedPrompt(promptText, analysis).then(optimizedPrompt => {
-      console.log('Got LLM optimized prompt, updating panel...');
-      promptData.setOptimizedVersion(optimizedPrompt);
-      this.storePromptData(promptData);
+    // Check if API key exists first - if not, use fast rule-based immediately
+    this.checkApiKeyStatus().then(hasApiKey => {
+      if (!hasApiKey) {
+        // No API key - use fast rule-based optimization immediately
+        const fallbackOptimization = this.optimizer.optimizePrompt(promptText, analysis);
+        promptData.setOptimizedVersion(fallbackOptimization);
+        this.storePromptData(promptData);
+        this.updateOptimizedPrompt(fallbackOptimization);
+        return;
+      }
       
-      // Update the panel with optimized prompt
-      this.updateOptimizedPrompt(optimizedPrompt);
-    }).catch(error => {
-      console.error('Error in LLM optimization flow:', error);
-      // Use rule-based optimization as fallback
-      const fallbackOptimization = this.optimizer.optimizePrompt(promptText, analysis);
-      promptData.setOptimizedVersion(fallbackOptimization);
-      this.storePromptData(promptData);
+      // Has API key - try LLM optimization with timeout
+      const optimizationPromise = this.getLLMOptimizedPrompt(promptText, analysis);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Optimization timeout')), 8000) // 8 second timeout
+      );
       
-      // Update the panel with fallback optimization
-      this.updateOptimizedPrompt(fallbackOptimization);
+      Promise.race([optimizationPromise, timeoutPromise])
+        .then(optimizedPrompt => {
+          console.log('Got LLM optimized prompt, updating panel...');
+          promptData.setOptimizedVersion(optimizedPrompt);
+          this.storePromptData(promptData);
+          this.updateOptimizedPrompt(optimizedPrompt);
+        })
+        .catch(error => {
+          console.error('Error in LLM optimization flow:', error);
+          // Use rule-based optimization as fallback
+          const fallbackOptimization = this.optimizer.optimizePrompt(promptText, analysis);
+          promptData.setOptimizedVersion(fallbackOptimization);
+          this.storePromptData(promptData);
+          this.updateOptimizedPrompt(fallbackOptimization);
+        });
     });
 
     setTimeout(() => {
@@ -1609,9 +1624,14 @@ class PromptTracer {
             <div>
               <h3 style="margin: 0; color: white; font-size: 16px; font-weight: 700;">Prompt Optimizer</h3>
               <div style="font-size: 11px; color: rgba(255,255,255,0.9); margin-top: 2px;">AI-powered optimization</div>
-        </div>
+            </div>
           </div>
-          <button id="close-analysis-panel" style="background: rgba(255,255,255,0.2); border: none; cursor: pointer; font-size: 18px; color: white; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button id="settings-btn" style="background: rgba(255,255,255,0.2); border: none; cursor: pointer; font-size: 14px; color: white; padding: 6px 10px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-weight: 500;" title="Open Settings">
+              ⚙️
+            </button>
+            <button id="close-analysis-panel" style="background: rgba(255,255,255,0.2); border: none; cursor: pointer; font-size: 18px; color: white; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
+          </div>
         </div>
       </div>
 
@@ -1694,6 +1714,29 @@ class PromptTracer {
 
     document.body.appendChild(panel);
 
+    // Add settings button functionality
+    const settingsButton = panel.querySelector('#settings-btn');
+    if (settingsButton) {
+      settingsButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Open extension popup to settings tab
+        chrome.runtime.sendMessage({ action: 'openSettings' });
+        // Also show a notification
+        this.showShortcutNotification('⚙️ Opening settings...');
+      });
+      
+      settingsButton.addEventListener('mouseenter', () => {
+        settingsButton.style.background = 'rgba(255,255,255,0.3)';
+        settingsButton.style.transform = 'scale(1.1)';
+      });
+      
+      settingsButton.addEventListener('mouseleave', () => {
+        settingsButton.style.background = 'rgba(255,255,255,0.2)';
+        settingsButton.style.transform = 'scale(1)';
+      });
+    }
+    
     // Add close button functionality
     const closeButton = panel.querySelector('#close-analysis-panel');
     if (closeButton) {
@@ -1705,11 +1748,11 @@ class PromptTracer {
       });
       
       closeButton.addEventListener('mouseenter', () => {
-        closeButton.style.background = 'rgba(0,0,0,0.1)';
+        closeButton.style.background = 'rgba(255,255,255,0.3)';
       });
       
       closeButton.addEventListener('mouseleave', () => {
-        closeButton.style.background = 'rgba(0,0,0,0.05)';
+        closeButton.style.background = 'rgba(255,255,255,0.2)';
       });
     }
 
