@@ -1144,11 +1144,31 @@ async function generateAIFeedback(originalPrompt, analysis) {
           // Clean up the response - remove markdown code blocks if present
           feedbackText = feedbackText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
           
+          // Try to extract JSON array from the response
+          // Look for JSON array pattern: [...]
+          const jsonMatch = feedbackText.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            feedbackText = jsonMatch[0];
+          }
+          
           try {
             const feedback = JSON.parse(feedbackText);
-            return { feedback: feedback, method: 'ai-powered' };
+            // Validate it's an array
+            if (Array.isArray(feedback) && feedback.length > 0) {
+              // Validate each item has required fields
+              const validFeedback = feedback.filter(item => 
+                item && typeof item === 'object' && 
+                item.type && item.title && 
+                (item.suggestion || item.message)
+              );
+              if (validFeedback.length > 0) {
+                return { feedback: validFeedback, method: 'ai-powered' };
+              }
+            }
+            throw new Error('Invalid feedback format');
           } catch (parseError) {
-            console.error('Failed to parse AI feedback:', parseError);
+            console.error('Failed to parse AI feedback:', parseError.message);
+            // Don't log the full error to avoid console spam
             return { feedback: null, method: 'rule-based' };
           }
         }

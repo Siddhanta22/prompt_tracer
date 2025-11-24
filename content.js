@@ -1553,6 +1553,14 @@ class PromptTracer {
     if (existingPanel) {
       existingPanel.remove();
     }
+    
+    // Check API key status first (needed for template)
+    let hasApiKey = false;
+    try {
+      hasApiKey = await this.checkApiKeyStatus();
+    } catch (error) {
+      hasApiKey = false;
+    }
 
     // Calculate overall quality score (0-100)
     // Metrics are already in 0-100 range, so no need to multiply
