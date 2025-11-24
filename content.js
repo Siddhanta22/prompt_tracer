@@ -1560,9 +1560,35 @@ class PromptTracer {
       document.head.appendChild(style);
     }
 
-    // Generate real-time feedback about what's wrong with the prompt
-    const feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
+    // Generate real-time feedback - try AI first, fallback to rule-based
     const hasApiKey = await this.checkApiKeyStatus();
+    let feedback = [];
+    
+    if (hasApiKey) {
+      // Try AI-powered feedback
+      try {
+        const aiFeedbackResponse = await chrome.runtime.sendMessage({
+          action: 'generateFeedback',
+          prompt: promptData.prompt,
+          analysis: analysis
+        });
+        
+        if (aiFeedbackResponse && aiFeedbackResponse.feedback && aiFeedbackResponse.feedback.length > 0) {
+          feedback = aiFeedbackResponse.feedback;
+          console.log('Using AI-powered feedback');
+        } else {
+          // Fallback to rule-based
+          feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
+          console.log('Using rule-based feedback (AI unavailable)');
+        }
+      } catch (error) {
+        console.error('AI feedback failed, using rule-based:', error);
+        feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
+      }
+    } else {
+      // No API key, use rule-based feedback
+      feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
+    }
     
     panel.innerHTML = `
       <!-- Header -->
@@ -2261,11 +2287,32 @@ class PromptTracer {
     });
   }
 
-  updatePanelInRealTime(promptText, analysis) {
+  async updatePanelInRealTime(promptText, analysis) {
     if (!this.currentPanel) return;
     
-    // Generate fresh feedback
-    const feedback = this.generateRealTimeFeedback(promptText, analysis);
+    // Generate fresh feedback - try AI first if available
+    let feedback = [];
+    const hasApiKey = await this.checkApiKeyStatus();
+    
+    if (hasApiKey) {
+      try {
+        const aiFeedbackResponse = await chrome.runtime.sendMessage({
+          action: 'generateFeedback',
+          prompt: promptText,
+          analysis: analysis
+        });
+        
+        if (aiFeedbackResponse && aiFeedbackResponse.feedback && aiFeedbackResponse.feedback.length > 0) {
+          feedback = aiFeedbackResponse.feedback;
+        } else {
+          feedback = this.generateRealTimeFeedback(promptText, analysis);
+        }
+      } catch (error) {
+        feedback = this.generateRealTimeFeedback(promptText, analysis);
+      }
+    } else {
+      feedback = this.generateRealTimeFeedback(promptText, analysis);
+    }
     
     // Update feedback section
     const feedbackSection = this.currentPanel.querySelector('[style*="What to Improve"]')?.parentElement;

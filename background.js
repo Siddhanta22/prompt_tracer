@@ -48,6 +48,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       chrome.action.openPopup();
       sendResponse({ success: true });
       return true;
+    case 'generateFeedback':
+      generateAIFeedback(request.prompt, request.analysis).then(sendResponse);
+      return true;
   }
 });
 
@@ -1064,6 +1067,131 @@ function applyOutputPotentialImprovements(prompt, metrics) {
     return improved;
   }
   return prompt;
+}
+
+// Generate AI-powered feedback for prompts
+async function generateAIFeedback(originalPrompt, analysis) {
+  try {
+    const result = await chrome.storage.local.get(['openai-api-key']);
+    const apiKey = result['openai-api-key'];
+    
+    // If no API key, return null to use rule-based feedback
+    if (!apiKey || !apiKey.startsWith('sk-')) {
+      return { feedback: null, method: 'rule-based' };
+    }
+    
+    // Create feedback prompt for LLM
+    const feedbackPrompt = createFeedbackPrompt(originalPrompt, analysis);
+    
+    // Call OpenAI API
+    const models = ['gpt-4-turbo-preview', 'gpt-4', 'gpt-3.5-turbo'];
+    let lastError = null;
+    
+    for (const model of models) {
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an expert prompt engineer. Analyze prompts and provide specific, actionable feedback. Return ONLY a JSON array of feedback objects, no other text.'
+              },
+              {
+                role: 'user',
+                content: feedbackPrompt
+              }
+            ],
+            max_tokens: 400,
+            temperature: 0.3
+          })
+        });
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            lastError = new Error(`Model ${model} not available`);
+            continue;
+          }
+          throw new Error(`OpenAI API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.choices && data.choices[0] && data.choices[0].message) {
+          let feedbackText = data.choices[0].message.content.trim();
+          
+          // Clean up the response - remove markdown code blocks if present
+          feedbackText = feedbackText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          
+          try {
+            const feedback = JSON.parse(feedbackText);
+            return { feedback: feedback, method: 'ai-powered' };
+          } catch (parseError) {
+            console.error('Failed to parse AI feedback:', parseError);
+            return { feedback: null, method: 'rule-based' };
+          }
+        }
+      } catch (error) {
+        console.log(`Failed with model ${model}, trying next...`, error.message);
+        lastError = error;
+        continue;
+      }
+    }
+    
+    // If all models failed, return null to use rule-based
+    return { feedback: null, method: 'rule-based' };
+  } catch (error) {
+    console.error('AI feedback generation failed:', error);
+    return { feedback: null, method: 'rule-based' };
+  }
+}
+
+// Create feedback prompt for LLM
+function createFeedbackPrompt(originalPrompt, analysis) {
+  const metrics = analysis.metrics || {};
+  
+  return `Analyze this prompt and provide specific, actionable feedback on how to improve it.
+
+PROMPT:
+"${originalPrompt}"
+
+CURRENT METRICS (0-100 scale):
+- Clarity: ${Math.round((metrics.clarity || 0))}
+- Specificity: ${Math.round((metrics.specificity || 0))}
+- Structure: ${Math.round((metrics.structure || 0))}
+- Context: ${Math.round((metrics.context || 0))}
+- Intent: ${Math.round((metrics.intent || 0))}
+- Completeness: ${Math.round((metrics.completeness || 0))}
+
+INSTRUCTIONS:
+Provide 2-4 specific, actionable feedback items. Each item should:
+1. Identify a specific issue or area for improvement
+2. Explain why it matters
+3. Give a concrete suggestion on how to fix it
+
+Focus on the most important issues that would significantly improve the prompt's effectiveness.
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "type": "error|warning|info",
+    "icon": "emoji",
+    "title": "Short, clear title",
+    "message": "Explanation of the issue",
+    "suggestion": "Specific, actionable suggestion"
+  }
+]
+
+Types:
+- "error": Critical issues that severely limit prompt effectiveness
+- "warning": Important issues that reduce prompt quality
+- "info": Helpful suggestions that would enhance the prompt
+
+Be specific and contextual. Don't use generic feedback. Tailor your suggestions to this exact prompt.`;
 }
 
 // Update settings
