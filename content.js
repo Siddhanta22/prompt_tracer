@@ -1479,7 +1479,7 @@ class PromptTracer {
     });
   }
 
-  showAnalysis(promptData, analysis, llmOptimizedPrompt = null) {
+  async showAnalysis(promptData, analysis, llmOptimizedPrompt = null) {
     // Don't show analysis for empty or very short prompts
     if (!promptData.prompt || promptData.prompt.trim().length < 3) {
       return;
@@ -1560,37 +1560,68 @@ class PromptTracer {
       document.head.appendChild(style);
     }
 
+    // Generate real-time feedback about what's wrong with the prompt
+    const feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
+    const hasApiKey = await this.checkApiKeyStatus();
+    
     panel.innerHTML = `
-      <!-- Header with Quality Score -->
-      <div style="background: linear-gradient(135deg, ${config.color}15, ${config.color}05); padding: 24px; border-radius: 20px 20px 0 0; border-bottom: 2px solid ${config.color}20;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #667eea15, #764ba205); padding: 24px; border-radius: 20px 20px 0 0; border-bottom: 2px solid #667eea20;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
           <div style="flex: 1;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-              <span style="font-size: 24px;">${config.icon}</span>
-              <h3 style="margin: 0; color: #333; font-size: 18px; font-weight: 700;">Prompt Quality</h3>
+              <span style="font-size: 24px;">💡</span>
+              <h3 style="margin: 0; color: #333; font-size: 18px; font-weight: 700;">Prompt Feedback</h3>
             </div>
-            <div style="font-size: 13px; color: #666; margin-bottom: 16px;">
-              ${this.getQualityDescription(quality)}
+            <div style="font-size: 13px; color: #666;">
+              Real-time suggestions to improve your prompt
             </div>
           </div>
           <button id="close-analysis-panel" style="background: rgba(0,0,0,0.05); border: none; cursor: pointer; font-size: 20px; color: #666; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
         </div>
+      </div>
+      
+      <!-- Real-time Feedback Section -->
+      <div style="padding: 24px;">
+        ${feedback.length > 0 ? `
+          <div style="margin-bottom: 20px;">
+            <h4 style="margin: 0 0 12px 0; color: #333; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+              <span>🎯</span>
+              <span>What to Improve</span>
+            </h4>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              ${feedback.map((item, index) => `
+                <div style="background: ${item.type === 'error' ? '#fff5f5' : item.type === 'warning' ? '#fffbf0' : '#f0f9ff'}; border-left: 4px solid ${item.type === 'error' ? '#f44336' : item.type === 'warning' ? '#ff9800' : '#2196f3'}; border-radius: 8px; padding: 12px; display: flex; align-items: flex-start; gap: 10px;">
+                  <span style="font-size: 18px; margin-top: 2px;">${item.icon}</span>
+                  <div style="flex: 1;">
+                    <div style="font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px;">${item.title}</div>
+                    <div style="font-size: 12px; color: #666; line-height: 1.5;">${item.message}</div>
+                    ${item.suggestion ? `<div style="font-size: 12px; color: #667eea; margin-top: 6px; font-weight: 500;">💡 ${item.suggestion}</div>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : `
+          <div style="text-align: center; padding: 20px; background: #f0f9ff; border-radius: 12px; border: 1px solid #b3e5fc;">
+            <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
+            <div style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 4px;">Great prompt!</div>
+            <div style="font-size: 12px; color: #666;">Your prompt looks good. The optimized version below will make it even better.</div>
+          </div>
+        `}
         
-        <!-- Single Quality Score Display -->
-        <div style="text-align: center;">
-          <div style="position: relative; display: inline-block;">
-            <div style="width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(from 0deg, ${config.color} 0% ${clampedScore}%, #e0e0e0 ${clampedScore}% 100%); display: flex; align-items: center; justify-content: center; position: relative;">
-              <div style="width: 90px; height: 90px; border-radius: 50%; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <div style="font-size: 32px; font-weight: 800; color: ${config.color}; line-height: 1;">${clampedScore}</div>
-                <div style="font-size: 11px; color: #999; font-weight: 600; margin-top: -4px;">/ 100</div>
+        ${!hasApiKey ? `
+          <div style="background: linear-gradient(135deg, #fffbf0, #fff8e1); border: 2px solid #ffc107; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+              <span style="font-size: 20px;">🔑</span>
+              <div style="flex: 1;">
+                <div style="font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px;">Enable AI-Powered Optimization</div>
+                <div style="font-size: 12px; color: #666; margin-bottom: 8px;">Add your OpenAI API key in settings for intelligent, context-aware prompt optimization (no hardcoded templates!).</div>
+                <button id="open-settings" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer;">Open Settings</button>
               </div>
             </div>
           </div>
-          <div style="margin-top: 12px; font-size: 14px; font-weight: 600; color: ${config.color};">
-            ${config.label} Quality
-          </div>
-        </div>
-      </div>
+        ` : ''}
 
       <!-- Optimized Prompt (Main Focus) -->
       <div style="padding: 24px;">
@@ -1678,6 +1709,16 @@ class PromptTracer {
             copyButton.textContent = 'Copy';
           }, 2000);
         });
+      });
+    }
+
+    // Add "Open Settings" button functionality
+    const openSettingsButton = panel.querySelector('#open-settings');
+    if (openSettingsButton) {
+      openSettingsButton.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ action: 'openSettings' });
+        panel.style.animation = 'slideIn 0.3s ease-out reverse';
+        setTimeout(() => panel.remove(), 300);
       });
     }
 

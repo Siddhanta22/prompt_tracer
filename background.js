@@ -44,6 +44,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'updateSettings':
       updateSettings(request.settings).then(sendResponse);
       return true;
+    case 'openSettings':
+      chrome.action.openPopup();
+      sendResponse({ success: true });
+      return true;
   }
 });
 
