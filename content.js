@@ -1523,17 +1523,19 @@ class PromptTracer {
       position: fixed;
       top: 20px;
       right: 20px;
-      width: 420px;
+      width: 400px;
       background: white;
-      border: 1px solid #e0e0e0;
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05);
       z-index: 999999;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 14px;
       pointer-events: auto;
-      max-height: 90vh;
-      overflow-y: auto;
+      max-height: 85vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
       animation: slideIn 0.3s ease-out;
     `;
 
@@ -1590,98 +1592,91 @@ class PromptTracer {
       feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
     }
     
+    // Limit feedback to top 2 most critical items to keep panel compact
+    const prioritizedFeedback = feedback
+      .sort((a, b) => {
+        const priority = { 'error': 3, 'warning': 2, 'info': 1 };
+        return (priority[b.type] || 0) - (priority[a.type] || 0);
+      })
+      .slice(0, 2);
+
     panel.innerHTML = `
-      <!-- Header -->
-      <div style="background: linear-gradient(135deg, #667eea15, #764ba205); padding: 24px; border-radius: 20px 20px 0 0; border-bottom: 2px solid #667eea20;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-          <div style="flex: 1;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-              <span style="font-size: 24px;">💡</span>
-              <h3 style="margin: 0; color: #333; font-size: 18px; font-weight: 700;">Prompt Feedback</h3>
-            </div>
-            <div style="font-size: 13px; color: #666;">
-              Real-time suggestions to improve your prompt
-            </div>
+      <!-- Compact Header -->
+      <div style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 16px 20px; border-radius: 16px 16px 0 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 32px; height: 32px; background: rgba(255,255,255,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px;">✨</div>
+            <div>
+              <h3 style="margin: 0; color: white; font-size: 16px; font-weight: 700;">Prompt Optimizer</h3>
+              <div style="font-size: 11px; color: rgba(255,255,255,0.9); margin-top: 2px;">AI-powered optimization</div>
+        </div>
           </div>
-          <button id="close-analysis-panel" style="background: rgba(0,0,0,0.05); border: none; cursor: pointer; font-size: 20px; color: #666; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
+          <button id="close-analysis-panel" style="background: rgba(255,255,255,0.2); border: none; cursor: pointer; font-size: 18px; color: white; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
         </div>
       </div>
-      
-      <!-- Real-time Feedback Section -->
-      <div style="padding: 24px;">
-        ${feedback.length > 0 ? `
-          <div style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0; color: #333; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-              <span>🎯</span>
-              <span>What to Improve</span>
-            </h4>
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              ${feedback.map((item, index) => `
-                <div style="background: ${item.type === 'error' ? '#fff5f5' : item.type === 'warning' ? '#fffbf0' : '#f0f9ff'}; border-left: 4px solid ${item.type === 'error' ? '#f44336' : item.type === 'warning' ? '#ff9800' : '#2196f3'}; border-radius: 8px; padding: 12px; display: flex; align-items: flex-start; gap: 10px;">
-                  <span style="font-size: 18px; margin-top: 2px;">${item.icon}</span>
-                  <div style="flex: 1;">
-                    <div style="font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px;">${item.title}</div>
-                    <div style="font-size: 12px; color: #666; line-height: 1.5;">${item.message}</div>
-                    ${item.suggestion ? `<div style="font-size: 12px; color: #667eea; margin-top: 6px; font-weight: 500;">💡 ${item.suggestion}</div>` : ''}
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : `
-          <div style="text-align: center; padding: 20px; background: #f0f9ff; border-radius: 12px; border: 1px solid #b3e5fc;">
-            <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
-            <div style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 4px;">Great prompt!</div>
-            <div style="font-size: 12px; color: #666;">Your prompt looks good. The optimized version below will make it even better.</div>
-          </div>
-        `}
-        
-        ${!hasApiKey ? `
-          <div style="background: linear-gradient(135deg, #fffbf0, #fff8e1); border: 2px solid #ffc107; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-            <div style="display: flex; align-items: flex-start; gap: 10px;">
-              <span style="font-size: 20px;">🔑</span>
-              <div style="flex: 1;">
-                <div style="font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px;">Enable AI-Powered Optimization</div>
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px;">Add your OpenAI API key in settings for intelligent, context-aware prompt optimization (no hardcoded templates!).</div>
-                <button id="open-settings" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer;">Open Settings</button>
+
+      <!-- Compact Feedback Section (Max 2 items) -->
+      <div style="padding: 16px 20px; background: #fafbfc; border-bottom: 1px solid #e5e7eb;">
+        ${prioritizedFeedback.length > 0 ? `
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${prioritizedFeedback.map((item, index) => `
+              <div style="background: white; border-left: 3px solid ${item.type === 'error' ? '#ef4444' : item.type === 'warning' ? '#f59e0b' : '#3b82f6'}; border-radius: 6px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <span style="font-size: 16px; flex-shrink: 0;">${item.icon}</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 2px;">${item.title}</div>
+                  <div style="font-size: 11px; color: #6b7280; line-height: 1.4;">${item.suggestion || item.message}</div>
               </div>
             </div>
-          </div>
-        ` : ''}
-
-      <!-- Optimized Prompt (Main Focus) -->
-      <div style="padding: 24px;">
-        ${llmOptimizedPrompt ? `
-          <div style="margin-bottom: 20px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-              <h4 style="margin: 0; color: #333; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-                <span>✨</span>
-                <span>Optimized Prompt</span>
-              </h4>
-              <button id="copy-optimized" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3); transition: all 0.2s;">Copy</button>
+            `).join('')}
             </div>
-            <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 16px; font-size: 14px; line-height: 1.6; color: #333; position: relative; max-height: 300px; overflow-y: auto;">
-              <div id="optimized-text" style="white-space: pre-wrap; word-wrap: break-word;">${llmOptimizedPrompt}</div>
-            </div>
-            <div style="margin-top: 8px; font-size: 11px; color: #667eea; font-weight: 500; display: flex; align-items: center; gap: 4px;">
-              <span>🤖</span>
-              <span>AI-powered • Real-time • Context-aware</span>
-            </div>
-          </div>
         ` : `
-          <div style="text-align: center; padding: 40px 20px; color: #999;">
-            <div style="font-size: 48px; margin-bottom: 12px;">⏳</div>
-            <div style="font-size: 14px; font-weight: 500;">Optimizing your prompt...</div>
-            <div style="font-size: 12px; margin-top: 8px; color: #bbb;">This may take a few seconds</div>
+          <div style="text-align: center; padding: 12px; background: #ecfdf5; border-radius: 8px; border: 1px solid #a7f3d0;">
+            <div style="font-size: 14px; font-weight: 600; color: #065f46; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>✨</span>
+              <span>Your prompt looks great!</span>
+          </div>
+            </div>
+        `}
+        </div>
+
+      <!-- Optimized Prompt (Main Focus - Always Visible) -->
+      <div style="padding: 20px; background: white; flex: 1; overflow-y: auto;">
+        ${llmOptimizedPrompt ? `
+          <div style="margin-bottom: 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 16px;">🚀</span>
+                <span style="font-size: 13px; font-weight: 600; color: #374151;">Ready-to-Use Version</span>
+        </div>
+              <button id="copy-optimized" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2); transition: all 0.2s;">Copy</button>
+          </div>
+            <div style="background: linear-gradient(135deg, #f8f9ff, #f0f4ff); border: 2px solid #e0e7ff; border-radius: 10px; padding: 14px; font-size: 13px; line-height: 1.6; color: #1f2937; position: relative; max-height: 200px; overflow-y: auto;">
+              <div id="optimized-text" style="white-space: pre-wrap; word-wrap: break-word;">${llmOptimizedPrompt}</div>
+        </div>
+            <div style="margin-top: 10px;">
+              <button id="use-optimized" style="width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.2s;">
+                Use This Prompt
+              </button>
+            </div>
+            ${hasApiKey ? `
+              <div style="margin-top: 8px; text-align: center; font-size: 10px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                <span>🤖</span>
+                <span>AI-powered optimization</span>
+          </div>
+            ` : `
+              <div style="margin-top: 10px; padding: 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; text-align: center;">
+                <div style="font-size: 11px; color: #92400e; margin-bottom: 6px; font-weight: 600;">💡 Enable AI Optimization</div>
+                <button id="open-settings" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 5px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer;">Add API Key</button>
+          </div>
+            `}
+        </div>
+        ` : `
+          <div style="text-align: center; padding: 30px 20px; color: #9ca3af;">
+            <div style="font-size: 36px; margin-bottom: 8px;">⏳</div>
+            <div style="font-size: 13px; font-weight: 500; color: #6b7280;">Optimizing your prompt...</div>
+            <div style="font-size: 11px; margin-top: 6px; color: #d1d5db;">This may take a few seconds</div>
           </div>
         `}
-
-        <!-- Single Action Button -->
-        ${llmOptimizedPrompt ? `
-          <button id="use-optimized" style="width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); transition: all 0.2s; margin-top: 16px;">
-            Use This Prompt
-          </button>
-        ` : ''}
       </div>
     `;
 
@@ -1784,7 +1779,7 @@ class PromptTracer {
         if (filled) {
           useButton.textContent = '✓ Prompt Inserted!';
           useButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
-          setTimeout(() => {
+    setTimeout(() => {
             panel.style.animation = 'slideIn 0.3s ease-out reverse';
             setTimeout(() => panel.remove(), 300);
           }, 1000);
@@ -2167,9 +2162,9 @@ class PromptTracer {
             this.lastMonitoredValue = trimmedValue;
             console.log('Auto-detected prompt change:', trimmedValue.substring(0, 50) + '...');
             this.capturePrompt(trimmedValue);
-            break;
-          }
+          break;
         }
+      }
         
         // If field is empty, clear the last monitored value
         if (trimmedValue.length === 0 && this.lastMonitoredValue) {
