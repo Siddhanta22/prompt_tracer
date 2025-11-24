@@ -1426,11 +1426,20 @@ class PromptTracer {
       
       Promise.race([optimizationPromise, timeoutPromise])
         .then(optimizedPrompt => {
-          console.log('Got LLM optimized prompt, updating panel...');
-          if (optimizedPrompt && optimizedPrompt !== promptText && optimizedPrompt !== immediateOptimization) {
+          console.log('Got LLM optimized prompt, updating panel...', optimizedPrompt);
+          console.log('Original:', promptText);
+          console.log('Rule-based:', immediateOptimization);
+          console.log('AI optimized:', optimizedPrompt);
+          
+          // Update if we got a valid AI optimization (always update if AI succeeded)
+          if (optimizedPrompt && optimizedPrompt.trim()) {
+            console.log('Updating panel with AI optimization');
             promptData.setOptimizedVersion(optimizedPrompt);
             this.storePromptData(promptData);
             this.updateOptimizedPrompt(optimizedPrompt);
+          } else {
+            console.log('AI optimization returned empty, keeping rule-based');
+            this.storePromptData(promptData);
           }
         })
         .catch(error => {
@@ -2666,35 +2675,89 @@ class PromptTracer {
   }
 
   updateOptimizedPrompt(optimizedPrompt) {
-    if (!this.currentPanel) return;
+    if (!this.currentPanel || !optimizedPrompt) {
+      console.log('Cannot update optimized prompt - no panel or no prompt');
+      return;
+    }
     
-    // Find the loading section
-    const loadingSection = this.currentPanel.querySelector('[style*="text-align: center; padding: 40px"]');
-    if (loadingSection) {
-      loadingSection.outerHTML = `
-        <div style="margin-bottom: 20px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-            <h4 style="margin: 0; color: #333; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-              <span>✨</span>
-              <span>Optimized Prompt</span>
-            </h4>
-            <button id="copy-optimized" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3); transition: all 0.2s;">Copy</button>
+    console.log('Updating optimized prompt in panel:', optimizedPrompt.substring(0, 50) + '...');
+    
+    // Find the optimized text element (works with both loading and existing states)
+    const optimizedTextElement = this.currentPanel.querySelector('#optimized-text');
+    const optimizedSection = this.currentPanel.querySelector('[style*="Ready-to-Use Version"]')?.closest('div[style*="padding: 20px"]');
+    const loadingSection = this.currentPanel.querySelector('[style*="Optimizing your prompt"]')?.closest('div[style*="text-align: center"]');
+    
+    if (optimizedTextElement) {
+      // Update existing optimized prompt text
+      optimizedTextElement.textContent = optimizedPrompt;
+      console.log('Updated existing optimized prompt text');
+      
+      // Update the AI-powered indicator if it exists
+      const aiIndicator = this.currentPanel.querySelector('[style*="AI-powered optimization"]');
+      if (aiIndicator && !aiIndicator.textContent.includes('AI-powered')) {
+        aiIndicator.innerHTML = `
+          <div style="margin-top: 8px; text-align: center; font-size: 10px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <span>🤖</span>
+            <span>AI-powered optimization</span>
           </div>
-          <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 16px; font-size: 14px; line-height: 1.6; color: #333; position: relative; max-height: 300px; overflow-y: auto;">
+        `;
+      }
+    } else if (loadingSection) {
+      // Replace loading section with optimized prompt
+      loadingSection.outerHTML = `
+        <div style="margin-bottom: 0;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 16px;">🚀</span>
+              <span style="font-size: 13px; font-weight: 600; color: #374151;">Ready-to-Use Version</span>
+            </div>
+            <button id="copy-optimized" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2); transition: all 0.2s;">Copy</button>
+          </div>
+          <div style="background: linear-gradient(135deg, #f8f9ff, #f0f4ff); border: 2px solid #e0e7ff; border-radius: 10px; padding: 14px; font-size: 13px; line-height: 1.6; color: #1f2937; position: relative; max-height: 200px; overflow-y: auto;">
             <div id="optimized-text" style="white-space: pre-wrap; word-wrap: break-word;">${optimizedPrompt}</div>
           </div>
-          <div style="margin-top: 8px; font-size: 11px; color: #667eea; font-weight: 500; display: flex; align-items: center; gap: 4px;">
+          <div style="margin-top: 10px;">
+            <button id="use-optimized" style="width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.2s;">
+              Use This Prompt
+            </button>
+          </div>
+          <div style="margin-top: 8px; text-align: center; font-size: 10px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
             <span>🤖</span>
-            <span>AI-powered • Real-time • Context-aware</span>
+            <span>AI-powered optimization</span>
           </div>
         </div>
-        <button id="use-optimized" style="width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); transition: all 0.2s; margin-top: 16px;">
-          Use This Prompt
-        </button>
       `;
+      console.log('Replaced loading section with optimized prompt');
       
       // Re-attach event listeners
-      const copyButton = this.currentPanel.querySelector('#copy-optimized');
+      this.attachOptimizedPromptListeners();
+    } else if (optimizedSection) {
+      // Update existing optimized prompt section
+      const existingText = optimizedSection.querySelector('#optimized-text');
+      if (existingText) {
+        existingText.textContent = optimizedPrompt;
+        console.log('Updated existing optimized prompt in section');
+        
+        // Update AI indicator
+        const aiIndicator = optimizedSection.querySelector('[style*="AI-powered"]');
+        if (aiIndicator) {
+          aiIndicator.innerHTML = `
+            <div style="margin-top: 8px; text-align: center; font-size: 10px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <span>🤖</span>
+              <span>AI-powered optimization</span>
+            </div>
+          `;
+        }
+      }
+    } else {
+      console.log('Could not find optimized prompt section to update');
+    }
+  }
+  
+  attachOptimizedPromptListeners() {
+    if (!this.currentPanel) return;
+    
+    const copyButton = this.currentPanel.querySelector('#copy-optimized');
       if (copyButton) {
         copyButton.addEventListener('click', () => {
           const text = this.currentPanel.querySelector('#optimized-text').textContent;
