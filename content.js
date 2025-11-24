@@ -2159,65 +2159,145 @@ class PromptTracer {
     }
   }
 
+  generateRealTimeFeedback(promptText, analysis) {
+    const feedback = [];
+    const metrics = analysis.metrics || {};
+    const words = promptText.split(' ').filter(w => w.length > 0);
+    const lowerPrompt = promptText.toLowerCase();
+    
+    // Check for specific issues and provide actionable feedback
+    if (words.length < 5) {
+      feedback.push({
+        type: 'error',
+        icon: '📝',
+        title: 'Too Short',
+        message: 'Your prompt is very brief. Longer prompts usually get better, more detailed responses.',
+        suggestion: 'Add more context about what you want to know or achieve.'
+      });
+    }
+    
+    if (metrics.clarity < 50) {
+      feedback.push({
+        type: 'warning',
+        icon: '🎯',
+        title: 'Unclear Request',
+        message: 'Your prompt could be clearer. The AI might not understand exactly what you need.',
+        suggestion: 'Use specific action words like "explain", "compare", "create", or "analyze".'
+      });
+    }
+    
+    if (metrics.specificity < 50) {
+      feedback.push({
+        type: 'warning',
+        icon: '📊',
+        title: 'Too Vague',
+        message: 'Your prompt lacks specific details. More specific prompts get better results.',
+        suggestion: 'Add details like: who is this for, what format you want, any constraints or preferences.'
+      });
+    }
+    
+    if (metrics.context < 50 && !lowerPrompt.includes('for') && !lowerPrompt.includes('about')) {
+      feedback.push({
+        type: 'info',
+        icon: '🌍',
+        title: 'Missing Context',
+        message: 'Adding context helps the AI provide more relevant responses.',
+        suggestion: 'Specify your audience (e.g., "for beginners"), domain, or use case.'
+      });
+    }
+    
+    if (metrics.structure < 50 && words.length > 10 && !promptText.includes('\n') && !promptText.includes(':')) {
+      feedback.push({
+        type: 'info',
+        icon: '📋',
+        title: 'Could Be Better Organized',
+        message: 'Structured prompts with clear sections often get better organized responses.',
+        suggestion: 'Use bullet points, numbered lists, or separate your request into clear parts.'
+      });
+    }
+    
+    if (metrics.intent < 50 && !lowerPrompt.includes('please') && !lowerPrompt.includes('can you') && !lowerPrompt.includes('?')) {
+      feedback.push({
+        type: 'info',
+        icon: '🎯',
+        title: 'Unclear Intent',
+        message: 'It\'s not clear what action you want the AI to take.',
+        suggestion: 'Start with action words: "Explain...", "Create...", "Compare...", "Help me..."'
+      });
+    }
+    
+    // Check for common issues
+    if (lowerPrompt.includes('tell me') && words.length < 8) {
+      feedback.push({
+        type: 'warning',
+        icon: '💬',
+        title: 'Generic Request',
+        message: '"Tell me" is quite generic. Be more specific about what you want to learn.',
+        suggestion: 'Instead of "Tell me about X", try "Explain X in simple terms" or "What are the key aspects of X?"'
+      });
+    }
+    
+    if (lowerPrompt.includes('best') || lowerPrompt.includes('good') || lowerPrompt.includes('nice')) {
+      if (!lowerPrompt.includes('why') && !lowerPrompt.includes('criteria') && !lowerPrompt.includes('compare')) {
+        feedback.push({
+          type: 'info',
+          icon: '⭐',
+          title: 'Subjective Terms',
+          message: 'Words like "best" or "good" are subjective. The AI needs criteria to judge.',
+          suggestion: 'Add what makes it "best" for you: budget, location, features, etc.'
+        });
+      }
+    }
+    
+    return feedback;
+  }
+
+  async checkApiKeyStatus() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['openai-api-key'], (result) => {
+        const apiKey = result['openai-api-key'];
+        resolve(apiKey && apiKey.startsWith('sk-') && apiKey.length > 20);
+      });
+    });
+  }
+
   updatePanelInRealTime(promptText, analysis) {
     if (!this.currentPanel) return;
     
-    // Calculate overall quality score (metrics are already 0-100)
-    const metrics = analysis.metrics || {};
-    const coreMetrics = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
-    const coreScores = coreMetrics.map(key => Math.max(0, Math.min(100, metrics[key] || 0))); // Ensure 0-100 range
-    const overallScore = Math.round(coreScores.reduce((a, b) => a + b, 0) / coreScores.length);
-    const clampedScore = Math.max(0, Math.min(100, overallScore)); // Final clamp to ensure 0-100
+    // Generate fresh feedback
+    const feedback = this.generateRealTimeFeedback(promptText, analysis);
     
-    // Determine quality level based on actual score
-    let quality = 'developing';
-    if (clampedScore < 30) quality = 'basic';
-    else if (clampedScore < 50) quality = 'developing';
-    else if (clampedScore < 70) quality = 'good';
-    else if (clampedScore < 85) quality = 'excellent';
-    else quality = 'masterful';
-    
-    const qualityConfig = {
-      basic: { color: '#f44336', label: 'Basic', icon: '🌱' },
-      developing: { color: '#ff9800', label: 'Developing', icon: '🚀' },
-      good: { color: '#4caf50', label: 'Good', icon: '✨' },
-      excellent: { color: '#2196f3', label: 'Excellent', icon: '🌟' },
-      masterful: { color: '#9c27b0', label: 'Masterful', icon: '👑' }
-    };
-    
-    const config = qualityConfig[quality] || qualityConfig.developing;
-    
-    // Update the score circle
-    const scoreCircle = this.currentPanel.querySelector('[style*="conic-gradient"]');
-    if (scoreCircle) {
-      scoreCircle.style.background = `conic-gradient(from 0deg, ${config.color} 0% ${clampedScore}%, #e0e0e0 ${clampedScore}% 100%)`;
-    }
-    
-    // Update the score number
-    const scoreNumber = this.currentPanel.querySelector('[style*="font-size: 32px"]');
-    if (scoreNumber) {
-      scoreNumber.textContent = clampedScore;
-      scoreNumber.style.color = config.color;
-    }
-    
-    // Update the quality label
-    const qualityLabel = this.currentPanel.querySelector('[style*="font-size: 14px; font-weight: 600"]');
-    if (qualityLabel && qualityLabel.textContent.includes('Quality')) {
-      qualityLabel.textContent = `${config.label} Quality`;
-      qualityLabel.style.color = config.color;
-    }
-    
-    // Update description
-    const description = this.currentPanel.querySelector('[style*="font-size: 13px; color: #666"]');
-    if (description && description.textContent.includes('prompt')) {
-      description.textContent = this.getQualityDescription(quality);
-    }
-    
-    // Update header background
-    const header = this.currentPanel.querySelector('[style*="background: linear-gradient"]');
-    if (header) {
-      header.style.background = `linear-gradient(135deg, ${config.color}15, ${config.color}05)`;
-      header.style.borderBottom = `2px solid ${config.color}20`;
+    // Update feedback section
+    const feedbackSection = this.currentPanel.querySelector('[style*="What to Improve"]')?.parentElement;
+    if (feedbackSection) {
+      if (feedback.length > 0) {
+        feedbackSection.innerHTML = `
+          <h4 style="margin: 0 0 12px 0; color: #333; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            <span>🎯</span>
+            <span>What to Improve</span>
+          </h4>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            ${feedback.map((item, index) => `
+              <div style="background: ${item.type === 'error' ? '#fff5f5' : item.type === 'warning' ? '#fffbf0' : '#f0f9ff'}; border-left: 4px solid ${item.type === 'error' ? '#f44336' : item.type === 'warning' ? '#ff9800' : '#2196f3'}; border-radius: 8px; padding: 12px; display: flex; align-items: flex-start; gap: 10px;">
+                <span style="font-size: 18px; margin-top: 2px;">${item.icon}</span>
+                <div style="flex: 1;">
+                  <div style="font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px;">${item.title}</div>
+                  <div style="font-size: 12px; color: #666; line-height: 1.5;">${item.message}</div>
+                  ${item.suggestion ? `<div style="font-size: 12px; color: #667eea; margin-top: 6px; font-weight: 500;">💡 ${item.suggestion}</div>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else {
+        feedbackSection.innerHTML = `
+          <div style="text-align: center; padding: 20px; background: #f0f9ff; border-radius: 12px; border: 1px solid #b3e5fc;">
+            <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
+            <div style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 4px;">Great prompt!</div>
+            <div style="font-size: 12px; color: #666;">Your prompt looks good. The optimized version below will make it even better.</div>
+          </div>
+        `;
+      }
     }
   }
 
