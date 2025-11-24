@@ -381,6 +381,7 @@ async function callOpenAI(prompt, apiKey) {
         throw new Error('Request timeout - API took too long to respond');
       }
       throw error;
+    }
   } catch (error) {
     console.error('OpenAI API call failed:', error);
     throw error;
