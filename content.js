@@ -1392,44 +1392,56 @@ class PromptTracer {
     const promptData = new PromptData(promptText, this.platform);
     const analysis = this.optimizer.analyzePrompt(promptText);
     
-    // Show analysis immediately with real-time score
+    // Show analysis immediately with rule-based optimization (fast, always works)
     if (!analysis.quality) {
       analysis.quality = this.optimizer.determineQuality(analysis.metrics || {});
     }
-    this.showAnalysis(promptData, analysis, null); // Show panel immediately, optimize in background
     
-    // Check if API key exists first - if not, use fast rule-based immediately
+    // Always show rule-based optimization immediately (no waiting)
+    const immediateOptimization = this.optimizer.optimizePrompt(promptText, analysis);
+    promptData.setOptimizedVersion(immediateOptimization);
+    this.showAnalysis(promptData, analysis, immediateOptimization); // Show panel immediately with rule-based
+    
+    // Try AI optimization in background if API key exists (non-blocking)
     this.checkApiKeyStatus().then(hasApiKey => {
       if (!hasApiKey) {
-        // No API key - use fast rule-based optimization immediately
-        const fallbackOptimization = this.optimizer.optimizePrompt(promptText, analysis);
-        promptData.setOptimizedVersion(fallbackOptimization);
+        // No API key - already showing rule-based, done
         this.storePromptData(promptData);
-        this.updateOptimizedPrompt(fallbackOptimization);
         return;
       }
       
-      // Has API key - try LLM optimization with timeout
+      // Has API key - try LLM optimization in background (updates panel when ready)
+      // Check if extension context is valid first
+      if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+        console.warn('Extension context invalidated - using rule-based optimization');
+        this.storePromptData(promptData);
+        return; // Already showing rule-based, no need to update
+      }
+      
+      // Try AI optimization with shorter timeout
       const optimizationPromise = this.getLLMOptimizedPrompt(promptText, analysis);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Optimization timeout')), 8000) // 8 second timeout
+        setTimeout(() => reject(new Error('Optimization timeout')), 5000) // 5 second timeout
       );
       
       Promise.race([optimizationPromise, timeoutPromise])
         .then(optimizedPrompt => {
           console.log('Got LLM optimized prompt, updating panel...');
-          promptData.setOptimizedVersion(optimizedPrompt);
-          this.storePromptData(promptData);
-          this.updateOptimizedPrompt(optimizedPrompt);
+          if (optimizedPrompt && optimizedPrompt !== promptText && optimizedPrompt !== immediateOptimization) {
+            promptData.setOptimizedVersion(optimizedPrompt);
+            this.storePromptData(promptData);
+            this.updateOptimizedPrompt(optimizedPrompt);
+          }
         })
         .catch(error => {
-          console.error('Error in LLM optimization flow:', error);
-          // Use rule-based optimization as fallback
-          const fallbackOptimization = this.optimizer.optimizePrompt(promptText, analysis);
-          promptData.setOptimizedVersion(fallbackOptimization);
+          console.log('AI optimization failed or timed out, keeping rule-based:', error.message);
+          // Keep the rule-based optimization that's already showing
           this.storePromptData(promptData);
-          this.updateOptimizedPrompt(fallbackOptimization);
         });
+    }).catch(error => {
+      console.log('Error checking API key status, using rule-based:', error);
+      // Already showing rule-based, just store the data
+      this.storePromptData(promptData);
     });
 
     setTimeout(() => {
@@ -1613,40 +1625,41 @@ class PromptTracer {
       document.head.appendChild(style);
     }
 
-    // Generate real-time feedback - try AI first, fallback to rule-based
-    const hasApiKey = await this.checkApiKeyStatus();
-    let feedback = [];
+    // Generate real-time feedback - use rule-based immediately (fast, always works)
+    let feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
     
-    if (hasApiKey) {
-      // Try AI-powered feedback
-      try {
-        // Check if extension context is valid
-        if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
-          throw new Error('Extension context invalidated');
-        }
-        
-        const aiFeedbackResponse = await chrome.runtime.sendMessage({
-          action: 'generateFeedback',
-          prompt: promptData.prompt,
-          analysis: analysis
-        });
-        
-        if (aiFeedbackResponse && aiFeedbackResponse.feedback && aiFeedbackResponse.feedback.length > 0) {
-          feedback = aiFeedbackResponse.feedback;
-          console.log('Using AI-powered feedback');
-        } else {
-          // Fallback to rule-based
-          feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
-          console.log('Using rule-based feedback (AI unavailable)');
-        }
-      } catch (error) {
-        console.error('AI feedback failed, using rule-based:', error);
-        feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
+    // Try AI feedback in background if available (non-blocking)
+    this.checkApiKeyStatus().then(hasApiKey => {
+      if (!hasApiKey || !chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+        return; // No API key or invalid context, keep rule-based
       }
-    } else {
-      // No API key, use rule-based feedback
-      feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
-    }
+      
+      // Try AI feedback with timeout (updates when ready)
+      const aiFeedbackPromise = chrome.runtime.sendMessage({
+        action: 'generateFeedback',
+        prompt: promptData.prompt,
+        analysis: analysis
+      });
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 3000)
+      );
+      
+      Promise.race([aiFeedbackPromise, timeoutPromise])
+        .then(aiFeedbackResponse => {
+          if (aiFeedbackResponse && aiFeedbackResponse.feedback && aiFeedbackResponse.feedback.length > 0) {
+            // Update feedback with AI version
+            this.updateFeedbackInPanel(aiFeedbackResponse.feedback);
+          }
+        })
+        .catch(error => {
+          // Keep rule-based feedback, AI failed or timed out
+          console.log('AI feedback timeout/failed, keeping rule-based');
+        });
+    }).catch(error => {
+      // Keep rule-based feedback
+      console.log('Error getting AI feedback, using rule-based');
+    });
     
     // Limit feedback to top 2 most critical items to keep panel compact
     const prioritizedFeedback = feedback
@@ -2541,6 +2554,37 @@ class PromptTracer {
         resolve(false);
       }
     });
+  }
+
+  updateFeedbackInPanel(feedback) {
+    if (!this.currentPanel || !feedback || feedback.length === 0) return;
+    
+    // Find the feedback section in the compact panel
+    const feedbackSection = this.currentPanel.querySelector('[style*="padding: 16px 20px; background: #fafbfc"]');
+    if (!feedbackSection) return;
+    
+    // Limit to top 2 most critical items
+    const prioritizedFeedback = feedback
+      .sort((a, b) => {
+        const priority = { 'error': 3, 'warning': 2, 'info': 1 };
+        return (priority[b.type] || 0) - (priority[a.type] || 0);
+      })
+      .slice(0, 2);
+    
+    // Update the feedback section
+    feedbackSection.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        ${prioritizedFeedback.map((item, index) => `
+          <div style="background: white; border-left: 3px solid ${item.type === 'error' ? '#ef4444' : item.type === 'warning' ? '#f59e0b' : '#3b82f6'}; border-radius: 6px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <span style="font-size: 16px; flex-shrink: 0;">${item.icon}</span>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 2px;">${item.title}</div>
+              <div style="font-size: 11px; color: #6b7280; line-height: 1.4;">${item.suggestion || item.message}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   async updatePanelInRealTime(promptText, analysis) {
