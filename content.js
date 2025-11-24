@@ -1662,12 +1662,24 @@ class PromptTracer {
               <div style="margin-top: 8px; text-align: center; font-size: 10px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
                 <span>🤖</span>
                 <span>AI-powered optimization</span>
-          </div>
+              </div>
             ` : `
-              <div style="margin-top: 10px; padding: 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; text-align: center;">
-                <div style="font-size: 11px; color: #92400e; margin-bottom: 6px; font-weight: 600;">💡 Enable AI Optimization</div>
-                <button id="open-settings" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 5px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer;">Add API Key</button>
-          </div>
+              <div style="margin-top: 12px; padding: 12px; background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fbbf24; border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                  <span style="font-size: 16px;">🔑</span>
+                  <div style="flex: 1;">
+                    <div style="font-size: 12px; font-weight: 600; color: #92400e; margin-bottom: 2px;">Enable AI Optimization</div>
+                    <div style="font-size: 10px; color: #78350f;">Add your OpenAI API key for better results</div>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <input type="password" id="inline-api-key" placeholder="sk-proj-..." style="flex: 1; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 11px; font-family: 'Monaco', 'Courier New', monospace; background: white;" autocomplete="off">
+                  <button id="save-inline-api-key" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; padding: 8px 14px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2); transition: all 0.2s;">Save</button>
+                </div>
+                <div style="margin-top: 8px; font-size: 10px; color: #78350f;">
+                  <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 500;">Get your key here</a>
+                </div>
+              </div>
             `}
         </div>
         ` : `
@@ -1733,7 +1745,78 @@ class PromptTracer {
       });
     }
 
-    // Add "Open Settings" button functionality
+    // Add inline API key input functionality
+    const inlineApiKeyInput = panel.querySelector('#inline-api-key');
+    const saveInlineApiKeyBtn = panel.querySelector('#save-inline-api-key');
+    
+    if (inlineApiKeyInput && saveInlineApiKeyBtn) {
+      // Save on button click
+      saveInlineApiKeyBtn.addEventListener('click', async () => {
+        const apiKey = inlineApiKeyInput.value.trim();
+        
+        if (!apiKey) {
+          saveInlineApiKeyBtn.textContent = 'Enter key';
+          saveInlineApiKeyBtn.style.background = '#ef4444';
+          setTimeout(() => {
+            saveInlineApiKeyBtn.textContent = 'Save';
+            saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+          }, 2000);
+          return;
+        }
+        
+        if (!apiKey.startsWith('sk-')) {
+          saveInlineApiKeyBtn.textContent = 'Invalid';
+          saveInlineApiKeyBtn.style.background = '#ef4444';
+          setTimeout(() => {
+            saveInlineApiKeyBtn.textContent = 'Save';
+            saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+          }, 2000);
+          return;
+        }
+        
+        // Save the key
+        saveInlineApiKeyBtn.textContent = 'Saving...';
+        saveInlineApiKeyBtn.style.opacity = '0.7';
+        saveInlineApiKeyBtn.disabled = true;
+        
+        chrome.storage.local.set({ 'openai-api-key': apiKey }, async () => {
+          // Test the API key
+          const testResponse = await chrome.runtime.sendMessage({
+            action: 'testApiKey',
+            apiKey: apiKey
+          });
+          
+          if (testResponse && testResponse.success) {
+            saveInlineApiKeyBtn.textContent = '✓ Saved!';
+            saveInlineApiKeyBtn.style.background = '#10b981';
+            
+            // Reload the panel with new API key
+            setTimeout(() => {
+              // Re-analyze with new API key
+              this.capturePrompt(promptData.prompt);
+            }, 1000);
+          } else {
+            saveInlineApiKeyBtn.textContent = 'Failed';
+            saveInlineApiKeyBtn.style.background = '#ef4444';
+            setTimeout(() => {
+              saveInlineApiKeyBtn.textContent = 'Save';
+              saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+              saveInlineApiKeyBtn.disabled = false;
+              saveInlineApiKeyBtn.style.opacity = '1';
+            }, 2000);
+          }
+        });
+      });
+      
+      // Save on Enter key
+      inlineApiKeyInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          saveInlineApiKeyBtn.click();
+        }
+      });
+    }
+    
+    // Add "Open Settings" button functionality (fallback)
     const openSettingsButton = panel.querySelector('#open-settings');
     if (openSettingsButton) {
       openSettingsButton.addEventListener('click', () => {
