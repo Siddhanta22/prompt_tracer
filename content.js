@@ -2814,7 +2814,6 @@ class PromptTracer {
         }
       });
     }
-    }
   }
 
   async getLLMOptimizedPrompt(originalPrompt, analysis) {
