@@ -79,6 +79,102 @@
             font-weight: 600;
         }
 
+        .header-actions {
+            position: absolute;
+            top: 15px;
+            right: 60px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .settings-btn {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .settings-btn:hover {
+            background: rgba(102, 126, 234, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .api-key-section {
+            background: linear-gradient(135deg, #fffbf0, #fff8e1);
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .api-key-input-wrapper {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            align-items: center;
+        }
+
+        .api-key-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            transition: all 0.2s;
+        }
+
+        .api-key-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .api-key-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .api-key-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .quick-setup {
+            background: linear-gradient(135deg, #f8f9ff, #e8ecff);
+            border: 1px solid #e1e5ff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .quick-setup-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .content {
             padding: 25px;
             background: white;
@@ -742,6 +838,34 @@
 
         <!-- Settings Tab -->
         <div class="tab-content" id="settings">
+            <!-- Quick Setup Section -->
+            <div class="quick-setup">
+                <div class="quick-setup-title">
+                    <span>🚀</span>
+                    <span>Quick Setup</span>
+                </div>
+                <div style="font-size: 13px; color: #666; line-height: 1.6; margin-bottom: 12px;">
+                    Enable AI-powered optimization for better, context-aware prompt suggestions. Your API key is stored locally and never shared.
+                </div>
+                <div class="api-key-section">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 18px;">🔑</span>
+                        <div style="flex: 1;">
+                            <div style="font-size: 15px; font-weight: 700; color: #333; margin-bottom: 4px;">OpenAI API Key</div>
+                            <div style="font-size: 12px; color: #666;">Get your key from <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 600;">OpenAI Platform</a></div>
+                        </div>
+                    </div>
+                    <div class="api-key-input-wrapper">
+                        <input type="password" id="openai-api-key" class="api-key-input" placeholder="sk-proj-..." autocomplete="off">
+                        <button id="save-api-key-btn" class="api-key-btn">Save Key</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.1);">
+                        <span id="api-status-indicator" style="font-size: 18px;">⚪</span>
+                        <span id="api-status-text" style="font-size: 13px; color: #666; font-weight: 500;">Checking status...</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="section">
                 <div class="section-title">
                     <div class="section-icon">⚙️</div>
@@ -778,25 +902,6 @@
                         <div class="settings-description">Use intelligent rules to optimize your prompts (Privacy-safe)</div>
                     </div>
                     <div class="toggle-switch active" id="llm-optimization-toggle"></div>
-                </div>
-
-                <div class="settings-item">
-                    <div class="settings-info">
-                        <div class="settings-title">OpenAI API Key (Premium)</div>
-                        <div class="settings-description">Optional: Add your OpenAI API key for real-time, context-aware prompt optimization (no hardcoded templates!). <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #667eea; text-decoration: none;">Get your key here</a></div>
-                    </div>
-                    <input type="password" id="openai-api-key" placeholder="sk-..." style="width: 200px; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
-                </div>
-                
-                <div class="settings-item">
-                    <div class="settings-info">
-                        <div class="settings-title">API Status</div>
-                        <div class="settings-description">Premium AI optimization status</div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span id="api-status-indicator" style="font-size: 16px;">⚪</span>
-                        <span id="api-status-text" style="font-size: 12px; color: #666;">Using free optimization</span>
-                    </div>
                 </div>
             </div>
 

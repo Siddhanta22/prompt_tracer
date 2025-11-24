@@ -39,14 +39,41 @@ function setupEventListeners() {
     // Clear data button
     document.getElementById('clear-data').addEventListener('click', clearData);
     
+    // Quick settings button in header
+    const quickSettingsBtn = document.getElementById('quick-settings-btn');
+    if (quickSettingsBtn) {
+        quickSettingsBtn.addEventListener('click', () => {
+            // Switch to settings tab
+            const settingsTab = document.querySelector('[data-tab="settings"]');
+            if (settingsTab) {
+                settingsTab.click();
+            }
+        });
+    }
+    
     // Settings toggles
     document.getElementById('auto-analysis-toggle').addEventListener('click', toggleSetting);
     document.getElementById('show-panel-toggle').addEventListener('click', toggleSetting);
     document.getElementById('save-history-toggle').addEventListener('click', toggleSetting);
     document.getElementById('llm-optimization-toggle').addEventListener('click', toggleSetting);
     
-    // API key input
-    document.getElementById('openai-api-key').addEventListener('input', saveApiKey);
+    // API key input - save on Enter key
+    const apiKeyInput = document.getElementById('openai-api-key');
+    const saveApiKeyBtn = document.getElementById('save-api-key-btn');
+    
+    if (apiKeyInput) {
+        apiKeyInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                saveApiKey(e);
+            }
+        });
+        // Also save on blur (when user clicks away)
+        apiKeyInput.addEventListener('blur', saveApiKey);
+    }
+    
+    if (saveApiKeyBtn) {
+        saveApiKeyBtn.addEventListener('click', saveApiKey);
+    }
 }
 
 function loadData() {
@@ -224,11 +251,30 @@ function toggleSetting(event) {
 }
 
 function saveApiKey(event) {
-    const apiKey = event.target.value;
-    chrome.storage.local.set({ 'openai-api-key': apiKey });
+    const apiKeyInput = document.getElementById('openai-api-key');
+    const apiKey = apiKeyInput ? apiKeyInput.value : (event.target.value || '');
+    
+    if (!apiKey || apiKey.trim() === '') {
+        return;
+    }
+    
+    chrome.storage.local.set({ 'openai-api-key': apiKey.trim() });
+    
+    // Update button text temporarily
+    const saveBtn = document.getElementById('save-api-key-btn');
+    if (saveBtn) {
+        const originalText = saveBtn.textContent;
+        saveBtn.textContent = 'Saving...';
+        saveBtn.style.opacity = '0.7';
+        
+        setTimeout(() => {
+            saveBtn.textContent = originalText;
+            saveBtn.style.opacity = '1';
+        }, 1000);
+    }
     
     // Update API status
-    updateApiStatus(apiKey);
+    updateApiStatus(apiKey.trim());
 }
 
 function updateApiStatus(apiKey) {
