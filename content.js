@@ -1725,10 +1725,20 @@ class PromptTracer {
       settingsButton.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        // Open extension popup to settings tab
-        chrome.runtime.sendMessage({ action: 'openSettings' });
-        // Also show a notification
-        this.showShortcutNotification('⚙️ Opening settings...');
+        try {
+          // Check if extension context is valid
+          if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+            this.showShortcutNotification('⚠️ Please reload the extension', 'warning');
+            return;
+          }
+          // Open extension popup to settings tab
+          chrome.runtime.sendMessage({ action: 'openSettings' });
+          // Also show a notification
+          this.showShortcutNotification('⚙️ Opening settings...');
+        } catch (error) {
+          console.error('Error opening settings:', error);
+          this.showShortcutNotification('⚠️ Please reload the extension', 'warning');
+        }
       });
       
       settingsButton.addEventListener('mouseenter', () => {
