@@ -1584,6 +1584,11 @@ class PromptTracer {
     if (hasApiKey) {
       // Try AI-powered feedback
       try {
+        // Check if extension context is valid
+        if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+          throw new Error('Extension context invalidated');
+        }
+        
         const aiFeedbackResponse = await chrome.runtime.sendMessage({
           action: 'generateFeedback',
           prompt: promptData.prompt,
@@ -1795,60 +1800,100 @@ class PromptTracer {
     if (inlineApiKeyInput && saveInlineApiKeyBtn) {
       // Save on button click
       saveInlineApiKeyBtn.addEventListener('click', async () => {
-        const apiKey = inlineApiKeyInput.value.trim();
-        
-        if (!apiKey) {
-          saveInlineApiKeyBtn.textContent = 'Enter key';
-          saveInlineApiKeyBtn.style.background = '#ef4444';
-          setTimeout(() => {
-            saveInlineApiKeyBtn.textContent = 'Save';
-            saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
-          }, 2000);
-          return;
-        }
-        
-        if (!apiKey.startsWith('sk-')) {
-          saveInlineApiKeyBtn.textContent = 'Invalid';
-          saveInlineApiKeyBtn.style.background = '#ef4444';
-          setTimeout(() => {
-            saveInlineApiKeyBtn.textContent = 'Save';
-            saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
-          }, 2000);
-          return;
-        }
-        
-        // Save the key
-        saveInlineApiKeyBtn.textContent = 'Saving...';
-        saveInlineApiKeyBtn.style.opacity = '0.7';
-        saveInlineApiKeyBtn.disabled = true;
-        
-        chrome.storage.local.set({ 'openai-api-key': apiKey }, async () => {
-          // Test the API key
-          const testResponse = await chrome.runtime.sendMessage({
-            action: 'testApiKey',
-            apiKey: apiKey
-          });
-          
-          if (testResponse && testResponse.success) {
-            saveInlineApiKeyBtn.textContent = '✓ Saved!';
-            saveInlineApiKeyBtn.style.background = '#10b981';
-            
-            // Reload the panel with new API key
-            setTimeout(() => {
-              // Re-analyze with new API key
-              this.capturePrompt(promptData.prompt);
-            }, 1000);
-          } else {
-            saveInlineApiKeyBtn.textContent = 'Failed';
+        try {
+          // Check if extension context is valid
+          if (!chrome || !chrome.storage || !chrome.storage.local) {
+            saveInlineApiKeyBtn.textContent = 'Reload extension';
             saveInlineApiKeyBtn.style.background = '#ef4444';
             setTimeout(() => {
               saveInlineApiKeyBtn.textContent = 'Save';
               saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
-              saveInlineApiKeyBtn.disabled = false;
-              saveInlineApiKeyBtn.style.opacity = '1';
-            }, 2000);
+            }, 3000);
+            return;
           }
-        });
+          
+          const apiKey = inlineApiKeyInput.value.trim();
+          
+          if (!apiKey) {
+            saveInlineApiKeyBtn.textContent = 'Enter key';
+            saveInlineApiKeyBtn.style.background = '#ef4444';
+            setTimeout(() => {
+              saveInlineApiKeyBtn.textContent = 'Save';
+              saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+            }, 2000);
+            return;
+          }
+          
+          if (!apiKey.startsWith('sk-')) {
+            saveInlineApiKeyBtn.textContent = 'Invalid';
+            saveInlineApiKeyBtn.style.background = '#ef4444';
+            setTimeout(() => {
+              saveInlineApiKeyBtn.textContent = 'Save';
+              saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+            }, 2000);
+            return;
+          }
+          
+          // Save the key
+          saveInlineApiKeyBtn.textContent = 'Saving...';
+          saveInlineApiKeyBtn.style.opacity = '0.7';
+          saveInlineApiKeyBtn.disabled = true;
+          
+          chrome.storage.local.set({ 'openai-api-key': apiKey }, async () => {
+            try {
+              // Check if runtime is available
+              if (!chrome.runtime || !chrome.runtime.sendMessage) {
+                throw new Error('Extension context invalidated');
+              }
+              
+              // Test the API key
+              const testResponse = await chrome.runtime.sendMessage({
+                action: 'testApiKey',
+                apiKey: apiKey
+              });
+              
+              if (testResponse && testResponse.success) {
+                saveInlineApiKeyBtn.textContent = '✓ Saved!';
+                saveInlineApiKeyBtn.style.background = '#10b981';
+                
+                // Reload the panel with new API key
+                setTimeout(() => {
+                  // Re-analyze with new API key
+                  this.capturePrompt(promptData.prompt);
+                }, 1000);
+              } else {
+                saveInlineApiKeyBtn.textContent = 'Failed';
+                saveInlineApiKeyBtn.style.background = '#ef4444';
+                setTimeout(() => {
+                  saveInlineApiKeyBtn.textContent = 'Save';
+                  saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+                  saveInlineApiKeyBtn.disabled = false;
+                  saveInlineApiKeyBtn.style.opacity = '1';
+                }, 2000);
+              }
+            } catch (error) {
+              console.error('Error testing API key:', error);
+              saveInlineApiKeyBtn.textContent = 'Error';
+              saveInlineApiKeyBtn.style.background = '#ef4444';
+              setTimeout(() => {
+                saveInlineApiKeyBtn.textContent = 'Save';
+                saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+                saveInlineApiKeyBtn.disabled = false;
+                saveInlineApiKeyBtn.style.opacity = '1';
+              }, 2000);
+            }
+          });
+        } catch (error) {
+          console.error('Error saving API key:', error);
+          saveInlineApiKeyBtn.textContent = 'Error';
+          saveInlineApiKeyBtn.style.background = '#ef4444';
+          setTimeout(() => {
+            saveInlineApiKeyBtn.textContent = 'Save';
+            saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+            saveInlineApiKeyBtn.disabled = false;
+            saveInlineApiKeyBtn.style.opacity = '1';
+          }, 2000);
+        }
       });
       
       // Save on Enter key
@@ -2401,10 +2446,27 @@ class PromptTracer {
 
   async checkApiKeyStatus() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(['openai-api-key'], (result) => {
-        const apiKey = result['openai-api-key'];
-        resolve(apiKey && apiKey.startsWith('sk-') && apiKey.length > 20);
-      });
+      try {
+        // Check if chrome.storage is available (extension context might be invalidated)
+        if (!chrome || !chrome.storage || !chrome.storage.local) {
+          console.warn('Extension context invalidated - using fallback');
+          resolve(false);
+          return;
+        }
+        
+        chrome.storage.local.get(['openai-api-key'], (result) => {
+          try {
+            const apiKey = result['openai-api-key'];
+            resolve(apiKey && apiKey.startsWith('sk-') && apiKey.length > 20);
+          } catch (error) {
+            console.error('Error reading API key:', error);
+            resolve(false);
+          }
+        });
+      } catch (error) {
+        console.error('Extension context error:', error);
+        resolve(false);
+      }
     });
   }
 
