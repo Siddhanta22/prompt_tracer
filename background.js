@@ -36,20 +36,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       exportData().then(sendResponse);
       return true;
     case 'optimizePrompt':
-      optimizePromptWithLLM(request.prompt, request.analysis).then(sendResponse);
+      optimizePromptWithLLM(request.prompt, request.analysis)
+        .then(sendResponse)
+        .catch(error => {
+          console.error('Optimize prompt error:', error);
+          sendResponse({ optimized: null, method: 'error', error: error.message });
+        });
       return true;
     case 'testApiKey':
-      testApiKey(request.apiKey).then(sendResponse);
+      testApiKey(request.apiKey)
+        .then(sendResponse)
+        .catch(error => {
+          console.error('Test API key error:', error);
+          sendResponse({ success: false, error: error.message });
+        });
       return true;
     case 'updateSettings':
-      updateSettings(request.settings).then(sendResponse);
+      updateSettings(request.settings)
+        .then(sendResponse)
+        .catch(error => {
+          console.error('Update settings error:', error);
+          sendResponse({ success: false, error: error.message });
+        });
       return true;
     case 'openSettings':
-      chrome.action.openPopup();
-      sendResponse({ success: true });
+      try {
+        chrome.action.openPopup();
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error('Open settings error:', error);
+        sendResponse({ success: false, error: error.message });
+      }
       return true;
     case 'generateFeedback':
-      generateAIFeedback(request.prompt, request.analysis).then(sendResponse);
+      generateAIFeedback(request.prompt, request.analysis)
+        .then(sendResponse)
+        .catch(error => {
+          console.error('Generate feedback error:', error);
+          sendResponse({ feedback: null, method: 'error', error: error.message });
+        });
       return true;
   }
 });

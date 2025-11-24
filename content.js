@@ -2546,28 +2546,37 @@ class PromptTracer {
   async updatePanelInRealTime(promptText, analysis) {
     if (!this.currentPanel) return;
     
-    // Generate fresh feedback - try AI first if available
-    let feedback = [];
-    const hasApiKey = await this.checkApiKeyStatus();
+    // Generate fresh feedback - use rule-based immediately (fast, always works)
+    let feedback = this.generateRealTimeFeedback(promptText, analysis);
     
-    if (hasApiKey) {
-      try {
-        const aiFeedbackResponse = await chrome.runtime.sendMessage({
+    // Try AI feedback in background if available (non-blocking)
+    try {
+      const hasApiKey = await this.checkApiKeyStatus();
+      if (hasApiKey && chrome && chrome.runtime && chrome.runtime.sendMessage) {
+        // Try AI feedback with timeout
+        const aiFeedbackPromise = chrome.runtime.sendMessage({
           action: 'generateFeedback',
           prompt: promptText,
           analysis: analysis
         });
         
-        if (aiFeedbackResponse && aiFeedbackResponse.feedback && aiFeedbackResponse.feedback.length > 0) {
-          feedback = aiFeedbackResponse.feedback;
-        } else {
-          feedback = this.generateRealTimeFeedback(promptText, analysis);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 3000)
+        );
+        
+        try {
+          const aiFeedbackResponse = await Promise.race([aiFeedbackPromise, timeoutPromise]);
+          if (aiFeedbackResponse && aiFeedbackResponse.feedback && aiFeedbackResponse.feedback.length > 0) {
+            feedback = aiFeedbackResponse.feedback;
+          }
+        } catch (error) {
+          // Keep rule-based feedback, AI failed or timed out
+          console.log('AI feedback timeout/failed, using rule-based');
         }
-      } catch (error) {
-        feedback = this.generateRealTimeFeedback(promptText, analysis);
       }
-    } else {
-      feedback = this.generateRealTimeFeedback(promptText, analysis);
+    } catch (error) {
+      // Keep rule-based feedback
+      console.log('Error getting AI feedback, using rule-based');
     }
     
     // Update feedback section
@@ -2699,27 +2708,34 @@ class PromptTracer {
     try {
       console.log('Starting LLM optimization for prompt:', originalPrompt.substring(0, 50) + '...');
       
-      // Send request to background script for LLM optimization
-      const response = await chrome.runtime.sendMessage({
-        action: 'optimizePrompt',
-        prompt: originalPrompt,
-        analysis: analysis
-      });
+      // Check if extension context is valid
+      if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+        throw new Error('Extension context invalidated');
+      }
+      
+      // Send request to background script for LLM optimization with timeout
+      const response = await Promise.race([
+        chrome.runtime.sendMessage({
+          action: 'optimizePrompt',
+          prompt: originalPrompt,
+          analysis: analysis
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Message timeout')), 4000)
+        )
+      ]);
       
       console.log('Background script response:', response);
       
-      if (response && response.optimized) {
+      if (response && response.optimized && response.optimized !== originalPrompt) {
         console.log('LLM optimization successful using:', response.method);
-        console.log('Original prompt:', originalPrompt);
-        console.log('Optimized prompt:', response.optimized);
-        console.log('Are they the same?', originalPrompt === response.optimized);
         return response.optimized;
       } else {
-        console.log('LLM optimization failed, using fallback');
-        return this.smartFallbackOptimization(originalPrompt, analysis);
+        console.log('LLM optimization returned invalid result, using fallback');
+        throw new Error('Invalid optimization result');
       }
     } catch (error) {
-      console.log('LLM optimization failed, using fallback:', error);
+      console.log('LLM optimization failed, using fallback:', error.message);
       // Use smart fallback as backup
       return this.smartFallbackOptimization(originalPrompt, analysis);
     }
