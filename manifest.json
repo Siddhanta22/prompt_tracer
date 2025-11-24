@@ -2,9 +2,9 @@
   "manifest_version": 3,
   "name": "Prompt Tracer - AI Prompt Optimizer",
   "version": "1.0.0",
-  "description": "Transform your AI interactions with intelligent prompt analysis and optimization. Works on ChatGPT, Claude, Grok, and Gemini. Privacy-first, educational, and completely free.",
+  "description": "AI prompt analysis and optimization for ChatGPT, Claude, Grok, and Gemini. Privacy-first and free.",
   "author": "Prompt Tracer Team",
-  "homepage_url": "https://github.com/yourusername/prompt_tracer",
+  "homepage_url": "https://github.com/Siddhanta22/prompt_tracer",
   "permissions": [
     "activeTab",
     "storage",

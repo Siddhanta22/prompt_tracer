@@ -323,6 +323,6 @@ Prompt Tracer v1.0.0 is production-ready with:
 
 **Happy Prompt Engineering! 🚀**
 
-*Transform your AI interactions, one prompt at a time.*
+*Transform your AI interactions, one prompt at a time.* 
 
 **Ready for Chrome Web Store submission!** 🎉 

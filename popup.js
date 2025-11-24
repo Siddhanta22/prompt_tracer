@@ -336,7 +336,7 @@ function setupTutorialButton() {
 }
 
 // Initialize tutorial button
-setupTutorialButton();
+setupTutorialButton(); 
 
 // Enhanced Analytics Functions
 function updateAnalytics(history) {

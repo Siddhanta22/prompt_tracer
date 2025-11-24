@@ -1393,22 +1393,20 @@ class PromptTracer {
     const promptData = new PromptData(promptText, this.platform);
     const analysis = this.optimizer.analyzePrompt(promptText);
     
-    // Try LLM optimization first, fallback to rule-based
+    // Show analysis immediately with real-time score
+    if (!analysis.quality) {
+      analysis.quality = this.optimizer.determineQuality(analysis.metrics || {});
+    }
+    this.showAnalysis(promptData, analysis, null); // Show panel immediately, optimize in background
+    
+    // Try LLM optimization in background, update panel when ready
     this.getLLMOptimizedPrompt(promptText, analysis).then(optimizedPrompt => {
-      console.log('Got LLM optimized prompt, showing analysis panel...');
+      console.log('Got LLM optimized prompt, updating panel...');
       promptData.setOptimizedVersion(optimizedPrompt);
-      
-      // Store the prompt data
       this.storePromptData(promptData);
       
-      // Ensure analysis has proper quality before showing
-      if (!analysis.quality) {
-        analysis.quality = this.optimizer.determineQuality(analysis.metrics || {});
-      }
-      
-      // Show analysis in UI with LLM optimization
-      this.showAnalysis(promptData, analysis, optimizedPrompt);
-      console.log('Analysis panel should now be visible with LLM optimization');
+      // Update the panel with optimized prompt
+      this.updateOptimizedPrompt(optimizedPrompt);
     }).catch(error => {
       console.error('Error in LLM optimization flow:', error);
       // Use rule-based optimization as fallback
@@ -1416,12 +1414,8 @@ class PromptTracer {
       promptData.setOptimizedVersion(fallbackOptimization);
       this.storePromptData(promptData);
       
-      // Ensure analysis has proper quality before showing
-      if (!analysis.quality) {
-        analysis.quality = this.optimizer.determineQuality(analysis.metrics || {});
-      }
-      
-      this.showAnalysis(promptData, analysis, fallbackOptimization);
+      // Update the panel with fallback optimization
+      this.updateOptimizedPrompt(fallbackOptimization);
     });
 
     setTimeout(() => {
@@ -1498,131 +1492,133 @@ class PromptTracer {
       existingPanel.remove();
     }
 
-    // Create floating analysis panel
+    // Calculate overall quality score (0-100)
+    const metrics = analysis.metrics || {};
+    const coreMetrics = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
+    const coreScores = coreMetrics.map(key => (metrics[key] || 0) * 100);
+    const overallScore = Math.round(coreScores.reduce((a, b) => a + b, 0) / coreScores.length);
+    
+    // Get quality level and color based on score
+    const quality = analysis.quality || 'developing';
+    const qualityConfig = {
+      basic: { color: '#f44336', label: 'Basic', icon: '🌱', min: 0, max: 30 },
+      developing: { color: '#ff9800', label: 'Developing', icon: '🚀', min: 30, max: 50 },
+      good: { color: '#4caf50', label: 'Good', icon: '✨', min: 50, max: 70 },
+      excellent: { color: '#2196f3', label: 'Excellent', icon: '🌟', min: 70, max: 85 },
+      masterful: { color: '#9c27b0', label: 'Masterful', icon: '👑', min: 85, max: 100 }
+    };
+    
+    const config = qualityConfig[quality] || qualityConfig.developing;
+
+    // Create floating analysis panel - Clean, focused design
     const panel = document.createElement('div');
     panel.id = 'prompt-tracer-panel';
     panel.style.cssText = `
       position: fixed;
       top: 20px;
       right: 20px;
-      width: 450px;
+      width: 420px;
       background: white;
       border: 1px solid #e0e0e0;
-      border-radius: 16px;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
       z-index: 999999;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 14px;
       pointer-events: auto;
-      max-height: 85vh;
+      max-height: 90vh;
       overflow-y: auto;
+      animation: slideIn 0.3s ease-out;
     `;
 
-    // Get quality level and color
-    const quality = analysis.quality || 'developing';
-    const qualityConfig = {
-      basic: { color: '#f44336', label: 'Basic', icon: '🌱' },
-      developing: { color: '#ff9800', label: 'Developing', icon: '🚀' },
-      good: { color: '#4caf50', label: 'Good', icon: '✨' },
-      excellent: { color: '#2196f3', label: 'Excellent', icon: '🌟' },
-      masterful: { color: '#9c27b0', label: 'Masterful', icon: '👑' }
-    };
-    
-    const config = qualityConfig[quality] || qualityConfig.developing;
+    // Add CSS animation
+    if (!document.getElementById('prompt-tracer-styles')) {
+      const style = document.createElement('style');
+      style.id = 'prompt-tracer-styles';
+      style.textContent = `
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
 
     panel.innerHTML = `
-      <div style="padding: 24px; border-bottom: 1px solid #f0f0f0;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h3 style="margin: 0; color: #333; font-size: 20px; font-weight: 700;">🔍 Prompt Analysis</h3>
-          <button id="close-analysis-panel" style="background: none; border: none; cursor: pointer; font-size: 24px; color: #666; padding: 4px; border-radius: 4px; transition: background-color 0.2s;">×</button>
+      <!-- Header with Quality Score -->
+      <div style="background: linear-gradient(135deg, ${config.color}15, ${config.color}05); padding: 24px; border-radius: 20px 20px 0 0; border-bottom: 2px solid ${config.color}20;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <span style="font-size: 24px;">${config.icon}</span>
+              <h3 style="margin: 0; color: #333; font-size: 18px; font-weight: 700;">Prompt Quality</h3>
+            </div>
+            <div style="font-size: 13px; color: #666; margin-bottom: 16px;">
+              ${this.getQualityDescription(quality)}
+            </div>
+          </div>
+          <button id="close-analysis-panel" style="background: rgba(0,0,0,0.05); border: none; cursor: pointer; font-size: 20px; color: #666; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
         </div>
         
-        <div style="text-align: center; margin-bottom: 24px;">
-          <div style="font-size: 36px; margin-bottom: 12px;">${config.icon}</div>
-          <div style="font-size: 22px; font-weight: bold; color: ${config.color}; margin-bottom: 8px;">
+        <!-- Single Quality Score Display -->
+        <div style="text-align: center;">
+          <div style="position: relative; display: inline-block;">
+            <div style="width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(from 0deg, ${config.color} 0% ${overallScore}%, #e0e0e0 ${overallScore}% 100%); display: flex; align-items: center; justify-content: center; position: relative;">
+              <div style="width: 90px; height: 90px; border-radius: 50%; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <div style="font-size: 32px; font-weight: 800; color: ${config.color}; line-height: 1;">${overallScore}</div>
+                <div style="font-size: 11px; color: #999; font-weight: 600; margin-top: -4px;">/ 100</div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top: 12px; font-size: 14px; font-weight: 600; color: ${config.color};">
             ${config.label} Quality
-          </div>
-          <div style="font-size: 14px; color: #666; line-height: 1.4;">
-            ${this.getQualityDescription(quality)}
-          </div>
-          <div style="margin-top: 12px; padding: 8px 16px; background: ${config.color}15; border-radius: 20px; display: inline-block;">
-            <span style="font-size: 12px; font-weight: 600; color: ${config.color};">
-              ${this.getQualityEmoji(quality)} ${this.getQualityAction(quality)}
-            </span>
           </div>
         </div>
       </div>
 
+      <!-- Optimized Prompt (Main Focus) -->
       <div style="padding: 24px;">
-        <!-- Optimized Version Section (Priority 1) -->
         ${llmOptimizedPrompt ? `
-          <div style="margin-bottom: 24px;">
-            <div style="display: flex; align-items: center; margin-bottom: 16px;">
-              <h4 style="margin: 0; color: #333; font-size: 18px; font-weight: 700;">🚀 Ready-to-Use Version</h4>
-              <div style="margin-left: auto;">
-                <button id="copy-optimized" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);">Copy & Use</button>
-              </div>
+          <div style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <h4 style="margin: 0; color: #333; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <span>✨</span>
+                <span>Optimized Prompt</span>
+              </h4>
+              <button id="copy-optimized" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3); transition: all 0.2s;">Copy</button>
             </div>
-            <div style="background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%); border: 2px solid #e1e5ff; border-radius: 12px; padding: 20px; font-size: 14px; line-height: 1.6; color: #333; position: relative;">
-              <div id="optimized-text" style="margin-right: 0;">${llmOptimizedPrompt}</div>
+            <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 16px; font-size: 14px; line-height: 1.6; color: #333; position: relative; max-height: 300px; overflow-y: auto;">
+              <div id="optimized-text" style="white-space: pre-wrap; word-wrap: break-word;">${llmOptimizedPrompt}</div>
             </div>
-            <p style="font-size: 12px; color: #667eea; margin: 8px 0 0 0; font-weight: 500;">
-              ✨ Enhanced for maximum effectiveness
-            </p>
+            <div style="margin-top: 8px; font-size: 11px; color: #667eea; font-weight: 500; display: flex; align-items: center; gap: 4px;">
+              <span>🤖</span>
+              <span>AI-powered • Real-time • Context-aware</span>
+            </div>
           </div>
+        ` : `
+          <div style="text-align: center; padding: 40px 20px; color: #999;">
+            <div style="font-size: 48px; margin-bottom: 12px;">⏳</div>
+            <div style="font-size: 14px; font-weight: 500;">Optimizing your prompt...</div>
+            <div style="font-size: 12px; margin-top: 8px; color: #bbb;">This may take a few seconds</div>
+          </div>
+        `}
+
+        <!-- Single Action Button -->
+        ${llmOptimizedPrompt ? `
+          <button id="use-optimized" style="width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); transition: all 0.2s; margin-top: 16px;">
+            Use This Prompt
+          </button>
         ` : ''}
-
-        <!-- Quick Action Section -->
-        <div style="margin-bottom: 24px;">
-          <h4 style="margin: 0 0 16px 0; color: #333; font-size: 16px; font-weight: 600;">⚡ Quick Actions</h4>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; border: 1px solid #e9ecef; transition: all 0.2s ease;" onclick="this.style.transform='scale(0.98)'">
-              <div style="font-size: 24px; margin-bottom: 8px;">📊</div>
-              <div style="font-size: 12px; font-weight: 600; color: #333;">View Metrics</div>
-            </div>
-            <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; border: 1px solid #e9ecef; transition: all 0.2s ease;" onclick="this.style.transform='scale(0.98)'">
-              <div style="font-size: 24px; margin-bottom: 8px;">💡</div>
-              <div style="font-size: 12px; font-weight: 600; color: #333;">Get Tips</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Insights Section (Priority 2) -->
-        <div style="margin-bottom: 24px;">
-          <h4 style="margin: 0 0 16px 0; color: #333; font-size: 16px; font-weight: 600;">💡 Key Insights</h4>
-          ${this.renderInsights(analysis.insights)}
-        </div>
-
-        <!-- Metrics Section (Priority 3) -->
-        <div style="margin-bottom: 24px;">
-          <h4 style="margin: 0 0 16px 0; color: #333; font-size: 16px; font-weight: 600;">📊 Performance Breakdown</h4>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            ${this.renderMetrics(analysis.metrics)}
-          </div>
-        </div>
-
-        <!-- Suggestions Section (Priority 4) -->
-        ${analysis.suggestions.length > 0 ? `
-          <div style="margin-bottom: 24px;">
-            <h4 style="margin: 0 0 16px 0; color: #333; font-size: 16px; font-weight: 600;">🎯 Improvement Ideas</h4>
-            <div style="background: #f8f9fa; border-radius: 8px; padding: 16px;">
-              <ul style="margin: 0; padding-left: 20px; color: #555; font-size: 14px; line-height: 1.5;">
-                ${analysis.suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
-              </ul>
-            </div>
-          </div>
-        ` : ''}
-
-        <!-- Pro Tip Section (Priority 5) -->
-        <div style="background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 12px; padding: 16px; color: white;">
-          <div style="display: flex; align-items: center; margin-bottom: 8px;">
-            <span style="font-size: 18px; margin-right: 10px;">💡</span>
-            <strong style="font-size: 14px;">Pro Tip:</strong>
-          </div>
-          <p style="margin: 0; font-size: 13px; line-height: 1.4; opacity: 0.9;">
-            ${this.getProTip(quality, llmOptimizedPrompt)}
-          </p>
-        </div>
       </div>
     `;
 
@@ -1634,16 +1630,16 @@ class PromptTracer {
       closeButton.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        panel.remove();
+        panel.style.animation = 'slideIn 0.3s ease-out reverse';
+        setTimeout(() => panel.remove(), 300);
       });
       
-      // Add hover effect
       closeButton.addEventListener('mouseenter', () => {
-        closeButton.style.backgroundColor = '#f0f0f0';
+        closeButton.style.background = 'rgba(0,0,0,0.1)';
       });
       
       closeButton.addEventListener('mouseleave', () => {
-        closeButton.style.backgroundColor = 'transparent';
+        closeButton.style.background = 'rgba(0,0,0,0.05)';
       });
     }
 
@@ -1654,7 +1650,7 @@ class PromptTracer {
         const text = panel.querySelector('#optimized-text').textContent;
         navigator.clipboard.writeText(text).then(() => {
           const originalText = copyButton.textContent;
-          copyButton.textContent = '✅ Copied!';
+          copyButton.textContent = '✓ Copied';
           copyButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
           copyButton.style.boxShadow = '0 2px 8px rgba(76, 175, 80, 0.3)';
           
@@ -1664,7 +1660,6 @@ class PromptTracer {
             copyButton.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)';
           }, 2000);
         }).catch(() => {
-          // Fallback for older browsers
           const textArea = document.createElement('textarea');
           textArea.value = text;
           document.body.appendChild(textArea);
@@ -1672,20 +1667,82 @@ class PromptTracer {
           document.execCommand('copy');
           document.body.removeChild(textArea);
           
-          copyButton.textContent = '✅ Copied!';
+          copyButton.textContent = '✓ Copied';
           setTimeout(() => {
-            copyButton.textContent = 'Copy & Use';
+            copyButton.textContent = 'Copy';
           }, 2000);
         });
       });
     }
 
-    // Auto-remove after 20 seconds
-    setTimeout(() => {
-      if (panel.parentElement) {
-        panel.remove();
-      }
-    }, 20000);
+    // Add "Use This Prompt" button functionality
+    const useButton = panel.querySelector('#use-optimized');
+    if (useButton) {
+      useButton.addEventListener('click', () => {
+        const text = panel.querySelector('#optimized-text').textContent;
+        
+        // Try to find and fill the input field
+        const selectors = {
+          gpt: ['div[contenteditable="true"]', 'textarea[data-id="root"]', 'textarea[placeholder*="Message"]'],
+          claude: ['div[contenteditable="true"]', 'textarea[placeholder*="Message"]'],
+          grok: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]'],
+          gemini: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]']
+        };
+        
+        const platformSelectors = selectors[this.platform] || selectors.gpt;
+        let filled = false;
+        
+        for (const selector of platformSelectors) {
+          const element = document.querySelector(selector);
+          if (element) {
+            if (element.contentEditable === 'true') {
+              element.textContent = text;
+              element.dispatchEvent(new Event('input', { bubbles: true }));
+              filled = true;
+            } else if (element.tagName === 'TEXTAREA') {
+              element.value = text;
+              element.dispatchEvent(new Event('input', { bubbles: true }));
+              filled = true;
+            }
+            if (filled) break;
+          }
+        }
+        
+        if (filled) {
+          useButton.textContent = '✓ Prompt Inserted!';
+          useButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
+          setTimeout(() => {
+            panel.style.animation = 'slideIn 0.3s ease-out reverse';
+            setTimeout(() => panel.remove(), 300);
+          }, 1000);
+        } else {
+          // Fallback: copy to clipboard
+          navigator.clipboard.writeText(text).then(() => {
+            useButton.textContent = '✓ Copied to Clipboard!';
+            useButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
+            setTimeout(() => {
+              panel.style.animation = 'slideIn 0.3s ease-out reverse';
+              setTimeout(() => panel.remove(), 300);
+            }, 1000);
+          });
+        }
+      });
+      
+      useButton.addEventListener('mouseenter', () => {
+        useButton.style.transform = 'translateY(-2px)';
+        useButton.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
+      });
+      
+      useButton.addEventListener('mouseleave', () => {
+        useButton.style.transform = 'translateY(0)';
+        useButton.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+      });
+    }
+
+    // Store panel reference for real-time updates
+    this.currentPanel = panel;
+    this.currentAnalysis = analysis;
+    this.currentOptimizedPrompt = llmOptimizedPrompt;
   }
 
   renderMetrics(metrics) {
@@ -1996,10 +2053,10 @@ class PromptTracer {
   }
 
   startAutoMonitoring() {
-    // Monitor input field changes automatically
+    // Monitor input field changes automatically with real-time updates
     setInterval(() => {
       this.monitorInputField();
-    }, 2000); // Check every 2 seconds
+    }, 500); // Check every 500ms for real-time feel
   }
 
   monitorInputField() {
@@ -2019,12 +2076,26 @@ class PromptTracer {
         const currentValue = element.value || element.textContent || '';
         const trimmedValue = currentValue.trim();
         
-        // Only analyze if there's meaningful content (more than 3 characters)
+        // Real-time updates for existing panel
+        if (trimmedValue.length >= 3 && this.currentPanel) {
+          // Update quality score in real-time without full re-analysis
+          const quickAnalysis = this.optimizer.analyzePrompt(trimmedValue);
+          this.updatePanelInRealTime(trimmedValue, quickAnalysis);
+        }
+        
+        // Only do full analysis if there's meaningful content and it changed significantly
         if (trimmedValue.length >= 3 && trimmedValue !== this.lastMonitoredValue) {
-          this.lastMonitoredValue = trimmedValue;
-          console.log('Auto-detected prompt change:', trimmedValue.substring(0, 50) + '...');
-          this.capturePrompt(trimmedValue);
-          break;
+          // Only re-analyze if the change is significant (more than just a few characters)
+          const significantChange = !this.lastMonitoredValue || 
+            Math.abs(trimmedValue.length - this.lastMonitoredValue.length) > 5 ||
+            !trimmedValue.startsWith(this.lastMonitoredValue.substring(0, Math.min(10, this.lastMonitoredValue.length)));
+          
+          if (significantChange) {
+            this.lastMonitoredValue = trimmedValue;
+            console.log('Auto-detected prompt change:', trimmedValue.substring(0, 50) + '...');
+            this.capturePrompt(trimmedValue);
+            break;
+          }
         }
         
         // If field is empty, clear the last monitored value
@@ -2035,9 +2106,156 @@ class PromptTracer {
           if (existingPanel) {
             existingPanel.remove();
           }
+          this.currentPanel = null;
         }
       }
     }
+  }
+
+  updatePanelInRealTime(promptText, analysis) {
+    if (!this.currentPanel) return;
+    
+    // Calculate overall quality score
+    const metrics = analysis.metrics || {};
+    const coreMetrics = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
+    const coreScores = coreMetrics.map(key => (metrics[key] || 0) * 100);
+    const overallScore = Math.round(coreScores.reduce((a, b) => a + b, 0) / coreScores.length);
+    
+    // Get quality level
+    const quality = analysis.quality || 'developing';
+    const qualityConfig = {
+      basic: { color: '#f44336', label: 'Basic', icon: '🌱' },
+      developing: { color: '#ff9800', label: 'Developing', icon: '🚀' },
+      good: { color: '#4caf50', label: 'Good', icon: '✨' },
+      excellent: { color: '#2196f3', label: 'Excellent', icon: '🌟' },
+      masterful: { color: '#9c27b0', label: 'Masterful', icon: '👑' }
+    };
+    
+    const config = qualityConfig[quality] || qualityConfig.developing;
+    
+    // Update the score circle
+    const scoreCircle = this.currentPanel.querySelector('[style*="conic-gradient"]');
+    if (scoreCircle) {
+      scoreCircle.style.background = `conic-gradient(from 0deg, ${config.color} 0% ${overallScore}%, #e0e0e0 ${overallScore}% 100%)`;
+    }
+    
+    // Update the score number
+    const scoreNumber = this.currentPanel.querySelector('[style*="font-size: 32px"]');
+    if (scoreNumber) {
+      scoreNumber.textContent = overallScore;
+      scoreNumber.style.color = config.color;
+    }
+    
+    // Update the quality label
+    const qualityLabel = this.currentPanel.querySelector('[style*="font-size: 14px; font-weight: 600"]');
+    if (qualityLabel && qualityLabel.textContent.includes('Quality')) {
+      qualityLabel.textContent = `${config.label} Quality`;
+      qualityLabel.style.color = config.color;
+    }
+    
+    // Update description
+    const description = this.currentPanel.querySelector('[style*="font-size: 13px; color: #666"]');
+    if (description && description.textContent.includes('prompt')) {
+      description.textContent = this.getQualityDescription(quality);
+    }
+    
+    // Update header background
+    const header = this.currentPanel.querySelector('[style*="background: linear-gradient"]');
+    if (header) {
+      header.style.background = `linear-gradient(135deg, ${config.color}15, ${config.color}05)`;
+      header.style.borderBottom = `2px solid ${config.color}20`;
+    }
+  }
+
+  updateOptimizedPrompt(optimizedPrompt) {
+    if (!this.currentPanel) return;
+    
+    // Find the loading section
+    const loadingSection = this.currentPanel.querySelector('[style*="text-align: center; padding: 40px"]');
+    if (loadingSection) {
+      loadingSection.outerHTML = `
+        <div style="margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <h4 style="margin: 0; color: #333; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+              <span>✨</span>
+              <span>Optimized Prompt</span>
+            </h4>
+            <button id="copy-optimized" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3); transition: all 0.2s;">Copy</button>
+          </div>
+          <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 16px; font-size: 14px; line-height: 1.6; color: #333; position: relative; max-height: 300px; overflow-y: auto;">
+            <div id="optimized-text" style="white-space: pre-wrap; word-wrap: break-word;">${optimizedPrompt}</div>
+          </div>
+          <div style="margin-top: 8px; font-size: 11px; color: #667eea; font-weight: 500; display: flex; align-items: center; gap: 4px;">
+            <span>🤖</span>
+            <span>AI-powered • Real-time • Context-aware</span>
+          </div>
+        </div>
+        <button id="use-optimized" style="width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); transition: all 0.2s; margin-top: 16px;">
+          Use This Prompt
+        </button>
+      `;
+      
+      // Re-attach event listeners
+      const copyButton = this.currentPanel.querySelector('#copy-optimized');
+      if (copyButton) {
+        copyButton.addEventListener('click', () => {
+          const text = this.currentPanel.querySelector('#optimized-text').textContent;
+          navigator.clipboard.writeText(text).then(() => {
+            const originalText = copyButton.textContent;
+            copyButton.textContent = '✓ Copied';
+            copyButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
+            setTimeout(() => {
+              copyButton.textContent = originalText;
+              copyButton.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+            }, 2000);
+          });
+        });
+      }
+      
+      const useButton = this.currentPanel.querySelector('#use-optimized');
+      if (useButton) {
+        useButton.addEventListener('click', () => {
+          const text = this.currentPanel.querySelector('#optimized-text').textContent;
+          
+          const selectors = {
+            gpt: ['div[contenteditable="true"]', 'textarea[data-id="root"]', 'textarea[placeholder*="Message"]'],
+            claude: ['div[contenteditable="true"]', 'textarea[placeholder*="Message"]'],
+            grok: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]'],
+            gemini: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]']
+          };
+          
+          const platformSelectors = selectors[this.platform] || selectors.gpt;
+          let filled = false;
+          
+          for (const selector of platformSelectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+              if (element.contentEditable === 'true') {
+                element.textContent = text;
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+                filled = true;
+              } else if (element.tagName === 'TEXTAREA') {
+                element.value = text;
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+                filled = true;
+              }
+              if (filled) break;
+            }
+          }
+          
+          if (filled) {
+            useButton.textContent = '✓ Prompt Inserted!';
+            useButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
+            setTimeout(() => {
+              this.currentPanel.style.animation = 'slideIn 0.3s ease-out reverse';
+              setTimeout(() => this.currentPanel.remove(), 300);
+            }, 1000);
+          }
+        });
+      }
+    }
+    
+    this.currentOptimizedPrompt = optimizedPrompt;
   }
 
   async getLLMOptimizedPrompt(originalPrompt, analysis) {
@@ -2075,59 +2293,27 @@ class PromptTracer {
     const lowerPrompt = originalPrompt.toLowerCase();
     let optimized = originalPrompt;
     
-    // Context-aware optimization based on prompt content
-    if (lowerPrompt.includes('cover letter')) {
-      optimized = `Please help me write a compelling cover letter. I need guidance on:
-1. How to structure it effectively
-2. What key points to include
-3. How to make it stand out
-4. Common mistakes to avoid
-
-Could you provide a template or example?`;
-    } else if (lowerPrompt.includes('explain') && originalPrompt.split(' ').length < 5) {
-      const topic = originalPrompt.replace(/explain/i, '').trim();
-      optimized = `Please provide a comprehensive explanation of ${topic} that includes:
-- Clear definition and key concepts
-- Real-world examples and applications
-- Why it's important or relevant
-- Common misconceptions or challenges`;
-    } else if (lowerPrompt.includes('write') && lowerPrompt.includes('letter')) {
-      optimized = `I need help writing a professional letter. Please provide:
-- Proper structure and formatting
-- Key elements to include
-- Tone and language suggestions
-- Common phrases and templates`;
-    } else if (lowerPrompt.includes('big bang')) {
-      optimized = `Please explain the Big Bang theory in a way that's easy to understand, including:
-- What it is and when it happened
-- Key evidence supporting it
-- How the universe evolved from it
-- Common misconceptions about it`;
-    } else if (lowerPrompt.includes('ai') || lowerPrompt.includes('artificial intelligence')) {
-      optimized = `Please explain artificial intelligence in detail, covering:
-- What AI is and how it works
-- Different types of AI (narrow vs general)
-- Current applications and examples
-- Future implications and challenges`;
+    // Context-aware optimization based on prompt content - NO GENERIC TEMPLATES
+    if (lowerPrompt.includes('explain') || lowerPrompt.includes('what is') || lowerPrompt.includes('tell me about')) {
+      const topic = originalPrompt.replace(/explain|what is|tell me about/gi, '').trim();
+      optimized = `Please explain ${topic} in a clear and engaging way. I'd like to understand what it is, why it matters, key concepts, and real-world examples. Make it accessible and interesting.`;
+    } else if (lowerPrompt.includes('trip') || lowerPrompt.includes('travel') || lowerPrompt.includes('vacation') || lowerPrompt.includes('destination') || lowerPrompt.includes('beach')) {
+      optimized = `I'm planning a trip and need recommendations. Please suggest specific destinations with details about best time to visit, activities and attractions, accommodation options, and travel tips. Include both popular spots and hidden gems.`;
+    } else if (lowerPrompt.includes('movie') || lowerPrompt.includes('film') || lowerPrompt.includes('watch') || lowerPrompt.includes('entertainment')) {
+      optimized = `I'm looking for entertainment recommendations. Please suggest specific titles with brief descriptions, why they're worth watching, where to find them, and similar recommendations if I enjoy these.`;
+    } else if (lowerPrompt.includes('idea') || lowerPrompt.includes('suggest') || lowerPrompt.includes('recommend')) {
+      const topic = originalPrompt.replace(/give me|ideas for|suggest|recommend/gi, '').trim();
+      optimized = `I need creative and practical ideas related to ${topic}. Please provide specific suggestions with details about implementation, benefits, and any considerations I should know about.`;
+    } else if (lowerPrompt.includes('how to') || lowerPrompt.includes('guide') || lowerPrompt.includes('steps')) {
+      const task = originalPrompt.replace(/how to|guide|steps/gi, '').trim();
+      optimized = `I need guidance on how to ${task}. Please provide clear, practical steps with explanations, tips for success, and things to watch out for.`;
+    } else if (lowerPrompt.includes('write') || lowerPrompt.includes('create') || lowerPrompt.includes('generate')) {
+      optimized = `I need help ${originalPrompt.toLowerCase()}. Please provide guidance on how to approach this, key elements to include, and tips for making it effective.`;
     } else if (lowerPrompt.includes('compare')) {
-      optimized += `\n\nPlease provide a detailed comparison including:
-- Key differences and similarities
-- Pros and cons of each
-- Real-world examples
-- When to use each approach`;
-    } else if (lowerPrompt.includes('how to')) {
-      optimized += `\n\nPlease provide a step-by-step guide including:
-- Prerequisites or requirements
-- Detailed steps with explanations
-- Tips and best practices
-- Common mistakes to avoid`;
+      optimized = `I'd like to compare the topics mentioned. Please provide a helpful comparison with key differences, similarities, pros and cons, and when each option might be best.`;
     } else {
-      // Generic improvement for other prompts
-      optimized = `Please provide a detailed and comprehensive response about ${originalPrompt} that includes:
-- Clear explanations and definitions
-- Practical examples and applications
-- Relevant context and background
-- Actionable insights or takeaways`;
+      // Natural, conversational improvement - NO TEMPLATE
+      optimized = `I'd like to learn more about ${originalPrompt}. Please provide a helpful response that covers the key aspects, practical information, and anything else that would be useful to know about this topic.`;
     }
     
     return optimized;

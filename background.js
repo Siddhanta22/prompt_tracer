@@ -206,46 +206,105 @@ function createOptimizationPrompt(originalPrompt, analysis) {
   const issues = analysis.issues ? analysis.issues.map(issue => `- ${issue.issue}`).join('\n') : '';
   const score = analysis.overallScore || 0;
   
-  return `You are an expert prompt engineer. Your task is to create a highly effective, contextually appropriate prompt that will generate superior AI responses.
+  // Detect prompt intent and context
+  const lowerPrompt = originalPrompt.toLowerCase();
+  let contextHint = '';
+  
+  if (lowerPrompt.includes('explain') || lowerPrompt.includes('what is') || lowerPrompt.includes('tell me about')) {
+    contextHint = 'This is an explanation request. Create a natural, engaging explanation prompt that asks for clear information about the topic.';
+  } else if (lowerPrompt.includes('trip') || lowerPrompt.includes('travel') || lowerPrompt.includes('vacation') || lowerPrompt.includes('destination')) {
+    contextHint = 'This is a travel request. Create a practical, inspiring travel prompt with specific destination details, timing, and activities.';
+  } else if (lowerPrompt.includes('movie') || lowerPrompt.includes('film') || lowerPrompt.includes('watch') || lowerPrompt.includes('entertainment')) {
+    contextHint = 'This is an entertainment request. Create an engaging prompt for recommendations with creative suggestions and platform information.';
+  } else if (lowerPrompt.includes('idea') || lowerPrompt.includes('suggest') || lowerPrompt.includes('recommend')) {
+    contextHint = 'This is a recommendation request. Create a specific prompt asking for tailored suggestions based on the topic.';
+  } else if (lowerPrompt.includes('how to') || lowerPrompt.includes('guide') || lowerPrompt.includes('steps')) {
+    contextHint = 'This is an instructional request. Create a clear, step-by-step guide prompt with practical instructions.';
+  } else if (lowerPrompt.includes('write') || lowerPrompt.includes('create') || lowerPrompt.includes('generate')) {
+    contextHint = 'This is a creation request. Create a creative prompt that guides the AI to generate original content.';
+  }
+  
+  return `You are an expert prompt engineer specializing in creating natural, context-aware prompts. Your task is to transform the user's prompt into a highly effective version that feels natural and tailored to their specific need.
 
 ORIGINAL PROMPT:
 "${originalPrompt}"
 
-ANALYSIS:
-- Quality Score: ${score}/100
-- Key Areas for Improvement: Clarity, Specificity, Structure, Context
+CONTEXT: ${contextHint || 'General request - analyze the intent and create an appropriate prompt.'}
 
-INSTRUCTIONS:
-Analyze the ORIGINAL PROMPT and create an optimized version that is:
-1. **CONTEXTUALLY APPROPRIATE**: Match the tone and purpose of the original request
-2. **SPECIFIC TO THE TOPIC**: Don't use generic templates - tailor to the actual subject matter
-3. **NATURALLY ENHANCED**: Improve clarity and specificity while maintaining the original intent
-4. **TOPIC-AWARE**: Use appropriate language and structure for the specific domain
+CRITICAL RULES - YOU MUST FOLLOW THESE:
 
-EXAMPLES OF GOOD OPTIMIZATION:
+1. **NO GENERIC TEMPLATES**: Never use phrases like:
+   - "Please provide a comprehensive and detailed response about X that includes:"
+   - "1. Clear Definition 2. Practical Examples 3. Step-by-Step Guidance 4. Common Challenges 5. Best Practices 6. Resources"
+   - These are hardcoded templates that don't match the actual request
 
-If original is about travel: "Give me beach trip ideas"
-→ Optimize to: "I'm planning a beach vacation and need destination recommendations. Please suggest 5-7 beautiful beach destinations with details about: best time to visit, activities available, accommodation options, and travel tips. Include both popular and hidden gem locations."
+2. **NATURAL LANGUAGE**: Write the optimized prompt as if a real person is asking:
+   - Use conversational, natural phrasing
+   - Match the tone of the original (casual, formal, technical, creative)
+   - Don't add unnecessary structure unless the topic requires it
 
-If original is about learning: "Explain machine learning"  
-→ Optimize to: "Please explain machine learning in simple terms. Include: what it is, how it works with examples, real-world applications, and why it's important. Make it accessible for someone new to the topic."
+3. **TOPIC-SPECIFIC ENHANCEMENT**: 
+   - For "explain X" → Ask for clear explanation with examples relevant to X
+   - For "trip ideas" → Ask for specific destinations, timing, activities (NOT "common challenges")
+   - For "movie recommendations" → Ask for specific titles, genres, platforms (NOT "step-by-step guidance")
+   - For "project ideas" → Ask for creative, practical suggestions (NOT generic frameworks)
 
-If original is about creative projects: "Give me movie ideas"
-→ Optimize to: "I need creative movie plot ideas for [genre/setting]. Please provide 3-5 unique concepts with: basic premise, main characters, key conflict, and what makes each story compelling. Avoid clichés and think creatively."
+4. **CONTEXTUAL IMPROVEMENTS**:
+   - Add specific details that make sense for the topic
+   - Include relevant constraints or preferences
+   - Use appropriate language (technical for tech, casual for entertainment, etc.)
+   - Make it more engaging and specific WITHOUT using templates
 
-CRITICAL: 
-- DO NOT use generic templates like "common challenges" or "step-by-step guidance" for inappropriate topics
-- DO NOT add business/technical frameworks to creative or personal requests
-- DO make the prompt more specific and engaging while respecting the original intent
-- DO use appropriate language for the topic (casual for travel, technical for science, creative for art, etc.)
+EXAMPLES OF GOOD vs BAD:
 
-Provide ONLY the optimized prompt that's perfectly tailored to the original request:`;
+BAD (Generic Template):
+"Please provide a comprehensive and detailed response about 'Tell me about astrophysics' that includes:
+1. Clear Definition
+2. Practical Examples
+3. Step-by-Step Guidance
+4. Common Challenges
+5. Best Practices
+6. Resources"
+
+GOOD (Natural, Context-Aware):
+"Please explain astrophysics in an engaging way. I'm curious about: what it is and why it matters, key discoveries and theories, how it relates to space exploration, and what mysteries scientists are still trying to solve. Make it accessible for someone with basic science knowledge."
+
+BAD (Generic Template):
+"Please provide a comprehensive response about 'Give me beach trip ideas' that includes:
+1. Clear Definition
+2. Practical Examples..."
+
+GOOD (Natural, Travel-Specific):
+"I'm planning a beach vacation and need destination recommendations. Please suggest 5-7 beautiful beach destinations with details about: best time to visit, activities available, accommodation options, and travel tips. Include both popular spots and hidden gems."
+
+BAD (Generic Template):
+"Please provide a comprehensive response about 'Movie recommendations' that includes:
+1. Clear Definition..."
+
+GOOD (Natural, Entertainment-Specific):
+"I'm looking for movie recommendations. Please suggest 5-7 films that are: engaging and well-made, available on major streaming platforms, suitable for [mood/genre preference], and include a brief reason why each one is worth watching."
+
+YOUR TASK:
+Create an optimized version of "${originalPrompt}" that:
+- Feels natural and conversational
+- Is specific to the actual topic (not a generic template)
+- Enhances clarity and specificity in a way that makes sense for this particular request
+- Uses appropriate tone and language for the domain
+- Does NOT include numbered lists like "1. Clear Definition 2. Practical Examples" unless the topic genuinely requires structured output
+
+Return ONLY the optimized prompt text, nothing else. No explanations, no meta-commentary, just the prompt itself.`;
 }
 
 // Call OpenAI API
 async function callOpenAI(prompt, apiKey) {
   console.log('Calling OpenAI API with prompt:', prompt.substring(0, 100) + '...');
   
+  try {
+    // Try GPT-4 Turbo first for better quality, fallback to GPT-3.5 Turbo
+    const models = ['gpt-4-turbo-preview', 'gpt-4', 'gpt-3.5-turbo'];
+    let lastError = null;
+    
+    for (const model of models) {
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -254,40 +313,76 @@ async function callOpenAI(prompt, apiKey) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+            model: model,
         messages: [
           {
             role: 'system',
-            content: 'You are an expert prompt engineer. Provide only the optimized prompt, no explanations or additional text.'
+                content: 'You are an expert prompt engineer. Your ONLY job is to return the optimized prompt text. Do NOT include explanations, meta-commentary, or any text other than the optimized prompt itself. Return ONLY the prompt.'
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: 300,
-        temperature: 0.7
+            max_tokens: 500,
+            temperature: 0.3, // Lower temperature for more consistent, focused results
+            top_p: 0.9,
+            frequency_penalty: 0.2, // Slight penalty to avoid repetition
+            presence_penalty: 0.1
       })
     });
     
-    console.log('OpenAI API response status:', response.status);
+        console.log(`OpenAI API response status (${model}):`, response.status);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenAI API error response:', errorText);
+          console.error(`OpenAI API error response (${model}):`, errorText);
+          
+          // If it's a model not found error, try next model
+          if (response.status === 404 || errorText.includes('model') || errorText.includes('not found')) {
+            lastError = new Error(`Model ${model} not available`);
+            continue; // Try next model
+          }
+          
       throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
-    console.log('OpenAI API response data:', data);
+        console.log(`OpenAI API response data (${model}):`, data);
     
     if (data.choices && data.choices[0] && data.choices[0].message) {
-      const optimizedPrompt = data.choices[0].message.content.trim();
-      console.log('OpenAI optimized prompt:', optimizedPrompt);
+          let optimizedPrompt = data.choices[0].message.content.trim();
+          
+          // Clean up the response - remove any meta-commentary or explanations
+          // Sometimes GPT adds explanations even when told not to
+          optimizedPrompt = optimizedPrompt
+            .replace(/^(Here's|Here is|This is|The optimized prompt is|Optimized prompt:|Optimized version:)\s*/i, '')
+            .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+            .trim();
+          
+          // If the response still looks like it contains explanations, try to extract just the prompt
+          if (optimizedPrompt.includes('ORIGINAL PROMPT:') || optimizedPrompt.includes('Optimized:')) {
+            // Try to extract the actual prompt part
+            const promptMatch = optimizedPrompt.match(/(?:Optimized|Optimized prompt|Here's the optimized prompt)[:\s]*(.+)/is);
+            if (promptMatch) {
+              optimizedPrompt = promptMatch[1].trim();
+            }
+          }
+          
+          console.log(`OpenAI optimized prompt (${model}):`, optimizedPrompt);
       return optimizedPrompt;
     } else {
       throw new Error('Invalid response format from OpenAI API');
     }
+      } catch (error) {
+        console.log(`Failed with model ${model}, trying next...`, error.message);
+        lastError = error;
+        continue; // Try next model
+      }
+    }
+    
+    // If all models failed, throw the last error
+    throw lastError || new Error('All OpenAI models failed');
   } catch (error) {
     console.error('OpenAI API call failed:', error);
     throw error;
@@ -631,18 +726,34 @@ function applySpecificityEnhancements(prompt, intent, context) {
   return optimized;
 }
 
-// Create comprehensive optimization
+// Create comprehensive optimization (context-aware, no generic templates)
 function createComprehensiveOptimization(prompt, intent, context) {
-  return `Please provide a comprehensive and detailed response about "${prompt}" that includes:
-
-1. **Clear Definition**: What exactly is this and why is it important?
-2. **Practical Examples**: Real-world applications and use cases
-3. **Step-by-Step Guidance**: How to approach or implement this
-4. **Common Challenges**: What difficulties people typically face
-5. **Best Practices**: Tips and recommendations for success
-6. **Resources**: Where to learn more or get help
-
-Make your response actionable, informative, and easy to understand for someone who wants to learn about this topic.`;
+  const lowerPrompt = prompt.toLowerCase();
+  
+  // Context-aware optimization without generic templates
+  if (lowerPrompt.includes('explain') || lowerPrompt.includes('what is') || lowerPrompt.includes('tell me about')) {
+    const topic = prompt.replace(/explain|what is|tell me about/gi, '').trim();
+    return `Please explain ${topic} in a clear and engaging way. I'd like to understand: what it is and why it matters, key concepts or principles, real-world examples or applications, and how it relates to broader topics. Make it accessible and interesting.`;
+  }
+  
+  if (lowerPrompt.includes('trip') || lowerPrompt.includes('travel') || lowerPrompt.includes('vacation') || lowerPrompt.includes('destination')) {
+    return `I'm planning a trip and need recommendations. Please suggest specific destinations with details about: best time to visit, activities and attractions, accommodation options, and travel tips. Include both popular spots and hidden gems.`;
+  }
+  
+  if (lowerPrompt.includes('movie') || lowerPrompt.includes('film') || lowerPrompt.includes('watch') || lowerPrompt.includes('entertainment')) {
+    return `I'm looking for entertainment recommendations. Please suggest specific titles with brief descriptions, why they're worth watching, where to find them, and similar recommendations if I enjoy these.`;
+  }
+  
+  if (lowerPrompt.includes('idea') || lowerPrompt.includes('suggest') || lowerPrompt.includes('recommend')) {
+    return `I need creative and practical ideas related to: ${prompt}. Please provide specific suggestions with details about implementation, benefits, and any considerations I should know about.`;
+  }
+  
+  if (lowerPrompt.includes('how to') || lowerPrompt.includes('guide') || lowerPrompt.includes('steps')) {
+    return `I need guidance on how to ${prompt.replace(/how to|guide|steps/gi, '').trim()}. Please provide clear, practical steps with explanations, tips for success, and things to watch out for.`;
+  }
+  
+  // Generic fallback - but still natural, not template-based
+  return `I'd like to learn more about: ${prompt}. Please provide a helpful response that covers the key aspects, practical information, and anything else that would be useful to know about this topic.`;
 }
 
 // Context-specific optimization helpers
