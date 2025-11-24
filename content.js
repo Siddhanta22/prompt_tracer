@@ -1406,7 +1406,7 @@ class PromptTracer {
     this.checkApiKeyStatus().then(hasApiKey => {
       if (!hasApiKey) {
         // No API key - already showing rule-based, done
-        this.storePromptData(promptData);
+      this.storePromptData(promptData);
         return;
       }
       
@@ -1496,26 +1496,26 @@ class PromptTracer {
         return;
       }
       
-      chrome.storage.local.get(['promptHistory'], (result) => {
+    chrome.storage.local.get(['promptHistory'], (result) => {
         try {
           if (chrome.runtime && chrome.runtime.lastError) {
             console.warn('Extension context invalidated:', chrome.runtime.lastError.message);
             return;
           }
           
-          const history = result.promptHistory || [];
-          history.push(promptData);
-          
-          // Keep only last 100 prompts
-          if (history.length > 100) {
-            history.splice(0, history.length - 100);
-          }
-          
-          chrome.storage.local.set({ promptHistory: history });
+      const history = result.promptHistory || [];
+      history.push(promptData);
+      
+      // Keep only last 100 prompts
+      if (history.length > 100) {
+        history.splice(0, history.length - 100);
+      }
+      
+      chrome.storage.local.set({ promptHistory: history });
         } catch (error) {
           console.error('Error storing prompt:', error);
         }
-      });
+    });
     } catch (error) {
       console.error('Extension context error:', error);
     }
@@ -1528,19 +1528,19 @@ class PromptTracer {
         return;
       }
       
-      chrome.storage.local.get(['promptHistory'], (result) => {
+    chrome.storage.local.get(['promptHistory'], (result) => {
         try {
           if (chrome.runtime && chrome.runtime.lastError) {
             console.warn('Extension context invalidated:', chrome.runtime.lastError.message);
             return;
           }
           
-          const history = result.promptHistory || [];
-          const index = history.findIndex(p => p.id === promptData.id);
-          
-          if (index !== -1) {
-            history[index] = promptData;
-            chrome.storage.local.set({ promptHistory: history });
+      const history = result.promptHistory || [];
+      const index = history.findIndex(p => p.id === promptData.id);
+      
+      if (index !== -1) {
+        history[index] = promptData;
+        chrome.storage.local.set({ promptHistory: history });
           }
         } catch (error) {
           console.error('Error updating prompt:', error);
@@ -1562,7 +1562,7 @@ class PromptTracer {
     if (existingPanel) {
       existingPanel.remove();
     }
-    
+
     // Check API key status first (needed for template)
     let hasApiKey = false;
     try {
@@ -1695,7 +1695,7 @@ class PromptTracer {
             <div>
               <h3 style="margin: 0; color: white; font-size: 16px; font-weight: 700;">Prompt Optimizer</h3>
               <div style="font-size: 11px; color: rgba(255,255,255,0.9); margin-top: 2px;">AI-powered optimization</div>
-            </div>
+        </div>
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
             <button id="settings-btn" style="background: rgba(255,255,255,0.2); border: none; cursor: pointer; font-size: 14px; color: white; padding: 6px 10px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-weight: 500;" title="Open Settings">
@@ -1738,22 +1738,22 @@ class PromptTracer {
               <div style="display: flex; align-items: center; gap: 6px;">
                 <span style="font-size: 16px;">🚀</span>
                 <span style="font-size: 13px; font-weight: 600; color: #374151;">Ready-to-Use Version</span>
-        </div>
+            </div>
               <button id="copy-optimized" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2); transition: all 0.2s;">Copy</button>
-          </div>
+            </div>
             <div style="background: linear-gradient(135deg, #f8f9ff, #f0f4ff); border: 2px solid #e0e7ff; border-radius: 10px; padding: 14px; font-size: 13px; line-height: 1.6; color: #1f2937; position: relative; max-height: 200px; overflow-y: auto;">
               <div id="optimized-text" style="white-space: pre-wrap; word-wrap: break-word;">${llmOptimizedPrompt}</div>
-        </div>
+          </div>
             <div style="margin-top: 10px;">
               <button id="use-optimized" style="width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.2s;">
                 Use This Prompt
               </button>
-            </div>
+        </div>
             ${hasApiKey ? `
               <div style="margin-top: 8px; text-align: center; font-size: 10px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
                 <span>🤖</span>
                 <span>AI-powered optimization</span>
-              </div>
+        </div>
             ` : `
               <div style="margin-top: 12px; padding: 12px; background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fbbf24; border-radius: 8px;">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
@@ -1761,16 +1761,16 @@ class PromptTracer {
                   <div style="flex: 1;">
                     <div style="font-size: 12px; font-weight: 600; color: #92400e; margin-bottom: 2px;">Enable AI Optimization</div>
                     <div style="font-size: 10px; color: #78350f;">Add your OpenAI API key for better results</div>
-                  </div>
-                </div>
+          </div>
+        </div>
                 <div style="display: flex; gap: 6px; align-items: center;">
                   <input type="password" id="inline-api-key" placeholder="sk-proj-..." style="flex: 1; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 11px; font-family: 'Monaco', 'Courier New', monospace; background: white;" autocomplete="off">
                   <button id="save-inline-api-key" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; padding: 8px 14px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2); transition: all 0.2s;">Save</button>
-                </div>
+            </div>
                 <div style="margin-top: 8px; font-size: 10px; color: #78350f;">
                   <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 500;">Get your key here</a>
-                </div>
-              </div>
+          </div>
+          </div>
             `}
         </div>
         ` : `
@@ -1881,7 +1881,7 @@ class PromptTracer {
           if (!chrome || !chrome.storage || !chrome.storage.local) {
             saveInlineApiKeyBtn.textContent = 'Reload extension';
             saveInlineApiKeyBtn.style.background = '#ef4444';
-            setTimeout(() => {
+    setTimeout(() => {
               saveInlineApiKeyBtn.textContent = 'Save';
               saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
             }, 3000);
@@ -2758,62 +2758,62 @@ class PromptTracer {
     if (!this.currentPanel) return;
     
     const copyButton = this.currentPanel.querySelector('#copy-optimized');
-      if (copyButton) {
-        copyButton.addEventListener('click', () => {
-          const text = this.currentPanel.querySelector('#optimized-text').textContent;
-          navigator.clipboard.writeText(text).then(() => {
-            const originalText = copyButton.textContent;
-            copyButton.textContent = '✓ Copied';
-            copyButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
-            setTimeout(() => {
-              copyButton.textContent = originalText;
-              copyButton.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
-            }, 2000);
-          });
+    if (copyButton) {
+      copyButton.addEventListener('click', () => {
+        const text = this.currentPanel.querySelector('#optimized-text').textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = copyButton.textContent;
+          copyButton.textContent = '✓ Copied';
+          copyButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
+          setTimeout(() => {
+            copyButton.textContent = originalText;
+            copyButton.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+          }, 2000);
         });
-      }
-      
-      const useButton = this.currentPanel.querySelector('#use-optimized');
-      if (useButton) {
-        useButton.addEventListener('click', () => {
-          const text = this.currentPanel.querySelector('#optimized-text').textContent;
-          
-          const selectors = {
-            gpt: ['div[contenteditable="true"]', 'textarea[data-id="root"]', 'textarea[placeholder*="Message"]'],
-            claude: ['div[contenteditable="true"]', 'textarea[placeholder*="Message"]'],
-            grok: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]'],
-            gemini: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]']
-          };
-          
-          const platformSelectors = selectors[this.platform] || selectors.gpt;
-          let filled = false;
-          
-          for (const selector of platformSelectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-              if (element.contentEditable === 'true') {
-                element.textContent = text;
-                element.dispatchEvent(new Event('input', { bubbles: true }));
-                filled = true;
-              } else if (element.tagName === 'TEXTAREA') {
-                element.value = text;
-                element.dispatchEvent(new Event('input', { bubbles: true }));
-                filled = true;
-              }
-              if (filled) break;
+      });
+    }
+    
+    const useButton = this.currentPanel.querySelector('#use-optimized');
+    if (useButton) {
+      useButton.addEventListener('click', () => {
+        const text = this.currentPanel.querySelector('#optimized-text').textContent;
+        
+        const selectors = {
+          gpt: ['div[contenteditable="true"]', 'textarea[data-id="root"]', 'textarea[placeholder*="Message"]'],
+          claude: ['div[contenteditable="true"]', 'textarea[placeholder*="Message"]'],
+          grok: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]'],
+          gemini: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]']
+        };
+        
+        const platformSelectors = selectors[this.platform] || selectors.gpt;
+        let filled = false;
+        
+        for (const selector of platformSelectors) {
+          const element = document.querySelector(selector);
+          if (element) {
+            if (element.contentEditable === 'true') {
+              element.textContent = text;
+              element.dispatchEvent(new Event('input', { bubbles: true }));
+              filled = true;
+            } else if (element.tagName === 'TEXTAREA') {
+              element.value = text;
+              element.dispatchEvent(new Event('input', { bubbles: true }));
+              filled = true;
             }
+            if (filled) break;
           }
-          
-          if (filled) {
-            useButton.textContent = '✓ Prompt Inserted!';
-            useButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
-            setTimeout(() => {
-              this.currentPanel.style.animation = 'slideIn 0.3s ease-out reverse';
-              setTimeout(() => this.currentPanel.remove(), 300);
-            }, 1000);
-          }
-        });
-      }
+        }
+        
+        if (filled) {
+          useButton.textContent = '✓ Prompt Inserted!';
+          useButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
+          setTimeout(() => {
+            this.currentPanel.style.animation = 'slideIn 0.3s ease-out reverse';
+            setTimeout(() => this.currentPanel.remove(), 300);
+          }, 1000);
+        }
+      });
+    }
     }
   }
 
@@ -2829,9 +2829,9 @@ class PromptTracer {
       // Send request to background script for LLM optimization with timeout
       const response = await Promise.race([
         chrome.runtime.sendMessage({
-          action: 'optimizePrompt',
-          prompt: originalPrompt,
-          analysis: analysis
+        action: 'optimizePrompt',
+        prompt: originalPrompt,
+        analysis: analysis
         }),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Message timeout')), 4000)
