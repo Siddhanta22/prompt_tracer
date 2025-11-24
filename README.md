@@ -1,5 +1,6 @@
 # 🔍 Prompt Tracer - AI Prompt Optimizer
-<img width="1245" height="624" alt="Screenshot 2025-11-07 at 3 49 42 PM" src="https://github.com/user-attachments/assets/057343c0-496f-4820-ba5b-bb052c8fffb5" />
+<img width="1253" height="663" alt="Screenshot 2025-11-24 at 5 02 41 PM" src="https://github.com/user-attachments/assets/e32b443d-e3c9-4781-b743-676fccea79a7" />
+
 
 
 **Transform your AI interactions with intelligent prompt analysis and optimization. Write better prompts, get better results, and master the art of prompt engineering across ChatGPT, Claude, Grok, and Gemini.**
