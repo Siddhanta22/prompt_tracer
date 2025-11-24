@@ -1,5 +1,7 @@
 # 🔍 Prompt Tracer - AI Prompt Optimizer
 <img width="1253" height="663" alt="Screenshot 2025-11-24 at 5 02 41 PM" src="https://github.com/user-attachments/assets/e32b443d-e3c9-4781-b743-676fccea79a7" />
+<img width="1254" height="677" alt="Screenshot 2025-11-24 at 5 04 52 PM" src="https://github.com/user-attachments/assets/81722009-c3cc-491f-b6a1-e6d82a96ad3d" />
+
 
 
 
