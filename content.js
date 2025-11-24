@@ -1469,29 +1469,65 @@ class PromptTracer {
   }
 
   storePromptData(promptData) {
-    chrome.storage.local.get(['promptHistory'], (result) => {
-      const history = result.promptHistory || [];
-      history.push(promptData);
-      
-      // Keep only last 100 prompts
-      if (history.length > 100) {
-        history.splice(0, history.length - 100);
+    try {
+      if (!chrome || !chrome.storage || !chrome.storage.local) {
+        console.warn('Extension context invalidated - cannot store prompt');
+        return;
       }
       
-      chrome.storage.local.set({ promptHistory: history });
-    });
+      chrome.storage.local.get(['promptHistory'], (result) => {
+        try {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            console.warn('Extension context invalidated:', chrome.runtime.lastError.message);
+            return;
+          }
+          
+          const history = result.promptHistory || [];
+          history.push(promptData);
+          
+          // Keep only last 100 prompts
+          if (history.length > 100) {
+            history.splice(0, history.length - 100);
+          }
+          
+          chrome.storage.local.set({ promptHistory: history });
+        } catch (error) {
+          console.error('Error storing prompt:', error);
+        }
+      });
+    } catch (error) {
+      console.error('Extension context error:', error);
+    }
   }
 
   updatePromptData(promptData) {
-    chrome.storage.local.get(['promptHistory'], (result) => {
-      const history = result.promptHistory || [];
-      const index = history.findIndex(p => p.id === promptData.id);
-      
-      if (index !== -1) {
-        history[index] = promptData;
-        chrome.storage.local.set({ promptHistory: history });
+    try {
+      if (!chrome || !chrome.storage || !chrome.storage.local) {
+        console.warn('Extension context invalidated - cannot update prompt');
+        return;
       }
-    });
+      
+      chrome.storage.local.get(['promptHistory'], (result) => {
+        try {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            console.warn('Extension context invalidated:', chrome.runtime.lastError.message);
+            return;
+          }
+          
+          const history = result.promptHistory || [];
+          const index = history.findIndex(p => p.id === promptData.id);
+          
+          if (index !== -1) {
+            history[index] = promptData;
+            chrome.storage.local.set({ promptHistory: history });
+          }
+        } catch (error) {
+          console.error('Error updating prompt:', error);
+        }
+      });
+    } catch (error) {
+      console.error('Extension context error:', error);
+    }
   }
 
   async showAnalysis(promptData, analysis, llmOptimizedPrompt = null) {
@@ -2198,6 +2234,10 @@ class PromptTracer {
 
   reportError(context, error) {
     try {
+      if (!chrome || !chrome.storage || !chrome.storage.local) {
+        return; // Extension context invalidated
+      }
+      
       // Store error locally for debugging (no external transmission)
       const errorReport = {
         timestamp: new Date().toISOString(),
@@ -2210,15 +2250,23 @@ class PromptTracer {
       };
       
       chrome.storage.local.get(['errorLogs'], (result) => {
-        const errorLogs = result.errorLogs || [];
-        errorLogs.push(errorReport);
-        
-        // Keep only last 10 errors
-        if (errorLogs.length > 10) {
-          errorLogs.splice(0, errorLogs.length - 10);
+        try {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            return;
+          }
+          
+          const errorLogs = result.errorLogs || [];
+          errorLogs.push(errorReport);
+          
+          // Keep only last 10 errors
+          if (errorLogs.length > 10) {
+            errorLogs.splice(0, errorLogs.length - 10);
+          }
+          
+          chrome.storage.local.set({ errorLogs: errorLogs });
+        } catch (storageError) {
+          console.error('Failed to store error log:', storageError);
         }
-        
-        chrome.storage.local.set({ errorLogs: errorLogs });
       });
     } catch (reportError) {
       console.error('Failed to report error:', reportError);
@@ -2456,24 +2504,39 @@ class PromptTracer {
 
   async checkApiKeyStatus() {
     return new Promise((resolve) => {
+      // Always resolve to false if extension context is invalid
+      // This prevents the error from breaking the extension
       try {
-        // Check if chrome.storage is available (extension context might be invalidated)
-        if (!chrome || !chrome.storage || !chrome.storage.local) {
-          console.warn('Extension context invalidated - using fallback');
+        // Check if chrome APIs are available
+        if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
           resolve(false);
           return;
         }
         
-        chrome.storage.local.get(['openai-api-key'], (result) => {
-          try {
-            const apiKey = result['openai-api-key'];
-            resolve(apiKey && apiKey.startsWith('sk-') && apiKey.length > 20);
-          } catch (error) {
-            console.error('Error reading API key:', error);
-            resolve(false);
-          }
-        });
+        // Use try-catch around the entire operation
+        try {
+          chrome.storage.local.get(['openai-api-key'], (result) => {
+            try {
+              if (chrome.runtime && chrome.runtime.lastError) {
+                // Extension context invalidated
+                console.warn('Extension context invalidated');
+                resolve(false);
+                return;
+              }
+              const apiKey = result && result['openai-api-key'];
+              resolve(apiKey && apiKey.startsWith('sk-') && apiKey.length > 20);
+            } catch (error) {
+              console.error('Error reading API key:', error);
+              resolve(false);
+            }
+          });
+        } catch (error) {
+          // If chrome.storage.local.get itself throws, catch it here
+          console.error('Storage access error:', error);
+          resolve(false);
+        }
       } catch (error) {
+        // Catch any other errors (like accessing chrome itself)
         console.error('Extension context error:', error);
         resolve(false);
       }
