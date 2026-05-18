@@ -48,5 +48,13 @@ temp/
 
 # Test files
 test.html
-debug-*.js .env
+debug-*.js
+
+# Local dev scripts (not part of the extension)
+rewrite_*.sh
+rewrite_*.py
+apply_simplified_messages.sh
+simple_rewrite.sh
+simplify_commits.py
+
 .env

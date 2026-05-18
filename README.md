@@ -7,7 +7,7 @@
 
 **Transform your AI interactions with intelligent prompt analysis and optimization. Write better prompts, get better results, and master the art of prompt engineering across ChatGPT, Claude, Grok, and Gemini.**
 
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue)](https://github.com/Siddhanta22/prompt_tracer/releases)
+[![Version](https://img.shields.io/badge/Version-1.0.1-blue)](https://github.com/Siddhanta22/prompt_tracer/releases)
 [![Chrome Extension](https://img.shields.io/badge/Platform-Chrome%20Extension-green)](https://chrome.google.com/webstore)
 [![Privacy First](https://img.shields.io/badge/Privacy-Local%20Only-brightgreen)](#privacy-first)
 [![Open Source](https://img.shields.io/badge/Open%20Source-MIT-orange)](LICENSE)
@@ -160,11 +160,9 @@ prompt_tracer/
 ├── popup.js                  # Popup functionality
 ├── interactive-tutorial.js   # Interactive onboarding
 ├── chart.js                  # Custom analytics charting library
-├── icons/                    # Extension icons (16px, 48px, 128px, SVG)
+├── icons/                    # Extension icons (16–128px, SVG source)
 ├── PRIVACY_POLICY.md         # Privacy policy documentation
-├── STORE_LISTING.md          # Chrome Web Store materials
-├── PRODUCTION_CHECKLIST.md   # Production readiness guide
-└── SETUP_GUIDE.md            # Setup and installation guide
+└── STORE_LISTING.md          # Chrome Web Store listing copy
 ```
 
 ### **Key Classes**
@@ -302,12 +300,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **GitHub Repository**: [Siddhanta22/prompt_tracer](https://github.com/Siddhanta22/prompt_tracer)
 - **Chrome Web Store**: Coming Soon!
 - **Privacy Policy**: [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
-- **Production Checklist**: [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)
 - **Store Listing**: [STORE_LISTING.md](STORE_LISTING.md)
 
 ## 🚀 Production Ready
 
-Prompt Tracer v1.0.0 is production-ready with:
+Prompt Tracer v1.0.1 is production-ready with:
 - ✅ **Real-time Contextual Feedback** with AI-powered insights
 - ✅ **Professional Analytics Dashboard** with visual charts
 - ✅ **Context-Aware Optimization** for different prompt types
