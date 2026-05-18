@@ -45,6 +45,8 @@ temp/
 # Extension packaging
 *.crx
 *.pem
+store-assets/screenshot-raw-*.png
+prompt-tracer-v*.zip
 
 # Test files
 test.html

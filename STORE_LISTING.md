@@ -156,7 +156,7 @@ prompt engineering, AI optimization, ChatGPT, Claude, productivity, writing assi
 - **Developer**: Prompt Tracer Team
 - **Website**: https://github.com/Siddhanta22/prompt_tracer
 - **Support**: support@prompttracer.com
-- **Privacy Policy**: [Link to privacy policy]
+- **Privacy Policy**: https://github.com/Siddhanta22/prompt_tracer/blob/main/PRIVACY_POLICY.md
 
 ## Version Information
 - **Current Version**: 1.0.1
@@ -169,6 +169,7 @@ prompt engineering, AI optimization, ChatGPT, Claude, productivity, writing assi
 - **storage**: To save user preferences and prompt history locally
 - **scripting**: To inject analysis functionality into web pages
 - **downloads**: To allow users to export their data
+- **api.openai.com** (host): Optional — only when the user adds their own OpenAI API key for AI-powered optimization
 
 ## Release Notes
 **Version 1.0.0 - Initial Release**
