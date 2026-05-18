@@ -2,6 +2,18 @@
  * Popup script for Prompt Tracer extension
  */
 
+function normalizePromptScore(metrics) {
+    if (!metrics) return 0;
+    if (typeof metrics.overallScore === 'number') {
+        return metrics.overallScore <= 1
+            ? Math.round(metrics.overallScore * 100)
+            : Math.round(metrics.overallScore);
+    }
+    const keys = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
+    const scores = keys.map(k => Math.max(0, Math.min(100, metrics[k] || 0)));
+    return Math.round(scores.reduce((a, b) => a + b, 0) / keys.length);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize tabs
     initializeTabs();
@@ -89,7 +101,7 @@ function updateDashboard(history) {
     // Update stats
     const totalPrompts = history.length;
     const avgScore = history.length > 0 
-        ? Math.round(history.reduce((sum, prompt) => sum + (prompt.metrics?.overallScore || 0), 0) / history.length * 100)
+        ? Math.round(history.reduce((sum, prompt) => sum + normalizePromptScore(prompt.metrics), 0) / history.length)
         : 0;
     
     document.getElementById('total-prompts').textContent = totalPrompts;
@@ -151,7 +163,7 @@ function updateRecentPrompts(history) {
         const promptItem = document.createElement('div');
         promptItem.className = 'prompt-item';
         
-        const score = Math.round((prompt.metrics?.overallScore || 0) * 100);
+        const score = normalizePromptScore(prompt.metrics);
         const scoreClass = getScoreClass(score);
         
         promptItem.innerHTML = `
@@ -408,7 +420,7 @@ function updateTrendChart(charts, history) {
     // Get last 10 prompts for trend
     const recentPrompts = history.slice(-10);
     const trendData = recentPrompts.map((prompt, index) => ({
-        score: Math.round((prompt.metrics?.overallScore || 0) * 100),
+        score: normalizePromptScore(prompt.metrics),
         timestamp: prompt.timestamp,
         platform: prompt.platform
     }));
@@ -438,7 +450,7 @@ function updateScoreDistributionChart(charts, history) {
     };
     
     history.forEach(prompt => {
-        const score = Math.round((prompt.metrics?.overallScore || 0) * 100);
+        const score = normalizePromptScore(prompt.metrics);
         if (score <= 20) scoreRanges['0-20']++;
         else if (score <= 40) scoreRanges['21-40']++;
         else if (score <= 60) scoreRanges['41-60']++;
@@ -510,7 +522,7 @@ function calculateAchievements(history) {
     const achievements = [];
     const totalPrompts = history.length;
     const avgScore = totalPrompts > 0 ? 
-        history.reduce((sum, p) => sum + (p.metrics?.overallScore || 0), 0) / totalPrompts * 100 : 0;
+        history.reduce((sum, p) => sum + normalizePromptScore(p.metrics), 0) / totalPrompts : 0;
     
     // First Prompt Achievement
     achievements.push({
@@ -564,7 +576,7 @@ function calculateAchievements(history) {
     });
     
     // Consistency Champion Achievement
-    const highQualityPrompts = history.filter(p => (p.metrics?.overallScore || 0) * 100 >= 70).length;
+    const highQualityPrompts = history.filter(p => normalizePromptScore(p.metrics) >= 70).length;
     achievements.push({
         icon: '🏆',
         title: 'Consistency Champion',

@@ -2,6 +2,27 @@
  * Background service worker for Prompt Tracer extension
  */
 
+function normalizeMetricValue(value) {
+  if (value === undefined || value === null) return 0;
+  return value <= 1 ? value * 100 : value;
+}
+
+function isMetricBelow(value, threshold = 60) {
+  return normalizeMetricValue(value) < threshold;
+}
+
+function normalizePromptScore(metrics) {
+  if (!metrics) return 0;
+  if (typeof metrics.overallScore === 'number') {
+    return metrics.overallScore <= 1
+      ? Math.round(metrics.overallScore * 100)
+      : Math.round(metrics.overallScore);
+  }
+  const keys = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
+  const scores = keys.map(k => Math.max(0, Math.min(100, metrics[k] || 0)));
+  return Math.round(scores.reduce((a, b) => a + b, 0) / keys.length);
+}
+
 // Background script for Prompt Tracer extension
 
 // Initialize storage with default settings
@@ -111,7 +132,7 @@ async function getAnalytics() {
   // Calculate analytics
   const totalPrompts = history.length;
   const averageScore = history.reduce((sum, prompt) => 
-    sum + (prompt.metrics?.overallScore || 0), 0) / totalPrompts;
+    sum + normalizePromptScore(prompt.metrics), 0) / totalPrompts;
   
   // Platform usage
   const platformsUsed = {};
@@ -122,14 +143,14 @@ async function getAnalytics() {
   
   // Recent trends (last 10 prompts)
   const recentTrends = history.slice(-10).map(prompt => ({
-    score: Math.round((prompt.metrics?.overallScore || 0) * 100),
+    score: normalizePromptScore(prompt.metrics),
     timestamp: prompt.timestamp,
     platform: prompt.platform
   }));
   
   return {
     totalPrompts,
-    averageScore: Math.round(averageScore * 100),
+    averageScore: Math.round(averageScore),
     platformsUsed,
     recentTrends
   };
@@ -880,32 +901,32 @@ function applyMetricBasedOptimization(prompt, metrics, intent, context) {
   let optimized = prompt;
   
   // Improve clarity if score is low
-  if (metrics.clarity < 0.6) {
+  if (isMetricBelow(metrics.clarity, 60)) {
     optimized = improveClarity(optimized);
   }
   
   // Improve specificity if score is low
-  if (metrics.specificity < 0.6) {
+  if (isMetricBelow(metrics.specificity, 60)) {
     optimized = improveSpecificity(optimized, context);
   }
   
   // Improve structure if score is low
-  if (metrics.structure < 0.6) {
+  if (isMetricBelow(metrics.structure, 60)) {
     optimized = improveStructure(optimized, intent);
   }
   
   // Improve context if score is low
-  if (metrics.context < 0.6) {
+  if (isMetricBelow(metrics.context, 60)) {
     optimized = improveContext(optimized, context);
   }
   
   // Improve creativity if score is low
-  if (metrics.creativity < 0.5) {
+  if (isMetricBelow(metrics.creativity, 50)) {
     optimized = improveCreativity(optimized, intent);
   }
   
   // Improve engagement if score is low
-  if (metrics.engagement < 0.5) {
+  if (isMetricBelow(metrics.engagement, 50)) {
     optimized = improveEngagement(optimized);
   }
   
@@ -1035,7 +1056,7 @@ function improveEngagement(prompt) {
 
 // Apply creativity enhancements
 function applyCreativityEnhancements(prompt, metrics) {
-  if (metrics.creativity < 0.6) {
+  if (isMetricBelow(metrics.creativity, 60)) {
     return improveCreativity(prompt, 'general');
   }
   return prompt;
@@ -1043,7 +1064,7 @@ function applyCreativityEnhancements(prompt, metrics) {
 
 // Apply technical quality improvements
 function applyTechnicalQualityImprovements(prompt, metrics) {
-  if (metrics.technical_quality < 0.6) {
+  if (isMetricBelow(metrics.technical_quality, 60)) {
     let improved = prompt;
     
     // Add technical precision
@@ -1063,7 +1084,7 @@ function applyTechnicalQualityImprovements(prompt, metrics) {
 
 // Apply output potential improvements
 function applyOutputPotentialImprovements(prompt, metrics) {
-  if (metrics.output_potential < 0.6) {
+  if (isMetricBelow(metrics.output_potential, 60)) {
     let improved = prompt;
     
     // Add comprehensive requirements

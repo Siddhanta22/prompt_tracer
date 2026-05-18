@@ -154,12 +154,12 @@ prompt engineering, AI optimization, ChatGPT, Claude, productivity, writing assi
 
 ## Developer Information
 - **Developer**: Prompt Tracer Team
-- **Website**: https://github.com/yourusername/prompt_tracer
+- **Website**: https://github.com/Siddhanta22/prompt_tracer
 - **Support**: support@prompttracer.com
 - **Privacy Policy**: [Link to privacy policy]
 
 ## Version Information
-- **Current Version**: 1.0.0
+- **Current Version**: 1.0.1
 - **Size**: ~500KB
 - **Languages**: English
 - **Last Updated**: December 2024

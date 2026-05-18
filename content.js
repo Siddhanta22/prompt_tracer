@@ -973,12 +973,38 @@ class PromptOptimizer {
   }
 }
 
+const CORE_METRIC_KEYS = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
+
+function buildStoredMetrics(analysis) {
+  const metrics = { ...(analysis?.metrics || {}) };
+  const coreScores = CORE_METRIC_KEYS.map(key => Math.max(0, Math.min(100, metrics[key] || 0)));
+  metrics.overallScore = Math.round(coreScores.reduce((a, b) => a + b, 0) / coreScores.length);
+  return metrics;
+}
+
+function getOverallScoreFromMetrics(metrics) {
+  if (!metrics) return 0;
+  if (typeof metrics.overallScore === 'number') {
+    return metrics.overallScore <= 1
+      ? Math.round(metrics.overallScore * 100)
+      : Math.round(metrics.overallScore);
+  }
+  const coreScores = CORE_METRIC_KEYS.map(key => Math.max(0, Math.min(100, metrics[key] || 0)));
+  return Math.round(coreScores.reduce((a, b) => a + b, 0) / coreScores.length);
+}
+
 class PromptTracer {
   constructor() {
     this.platform = this.detectPlatform();
     this.optimizer = new PromptOptimizer();
     this.isCapturing = false;
     this.currentPrompt = null;
+    this.settings = {
+      autoAnalysis: true,
+      showPanel: true,
+      saveHistory: true,
+      llmOptimization: true
+    };
     this.init();
   }
 
@@ -996,7 +1022,7 @@ class PromptTracer {
     return 'unknown';
   }
 
-  init() {
+  async init() {
     try {
       console.log('Prompt Tracer: init() called');
       if (this.platform === 'unknown') {
@@ -1005,8 +1031,10 @@ class PromptTracer {
         return;
       }
 
+      await this.loadSettings();
       console.log(`Prompt Tracer: Initialized for ${this.platform}`);
       this.setupEventListeners();
+      this.setupSettingsListener();
       this.setupMutationObserver();
       this.injectUI();
       this.startAutoMonitoring();
@@ -1043,6 +1071,45 @@ class PromptTracer {
     } catch (error) {
       console.error('Tutorial check failed:', error);
     }
+  }
+
+  loadSettings() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(
+        ['auto-analysis', 'show-panel', 'save-history', 'llm-optimization'],
+        (result) => {
+          this.settings = {
+            autoAnalysis: result['auto-analysis'] !== false,
+            showPanel: result['show-panel'] !== false,
+            saveHistory: result['save-history'] !== false,
+            llmOptimization: result['llm-optimization'] !== false
+          };
+          resolve();
+        }
+      );
+    });
+  }
+
+  setupSettingsListener() {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local') return;
+      if (changes['auto-analysis']) {
+        this.settings.autoAnalysis = changes['auto-analysis'].newValue !== false;
+      }
+      if (changes['show-panel']) {
+        this.settings.showPanel = changes['show-panel'].newValue !== false;
+        if (!this.settings.showPanel) {
+          const panel = document.getElementById('prompt-tracer-panel');
+          if (panel) panel.remove();
+        }
+      }
+      if (changes['save-history']) {
+        this.settings.saveHistory = changes['save-history'].newValue !== false;
+      }
+      if (changes['llm-optimization']) {
+        this.settings.llmOptimization = changes['llm-optimization'].newValue !== false;
+      }
+    });
   }
 
   setupEventListeners() {
@@ -1385,12 +1452,14 @@ class PromptTracer {
   capturePrompt(promptText) {
     // Don't analyze empty or very short prompts
     if (!promptText || promptText.trim().length < 3 || this.isCapturing) return;
+    if (!this.settings.autoAnalysis) return;
 
     this.isCapturing = true;
     console.log('Prompt Tracer: Capturing prompt:', promptText.substring(0, 50) + '...');
 
     const promptData = new PromptData(promptText, this.platform);
     const analysis = this.optimizer.analyzePrompt(promptText);
+    promptData.metrics = buildStoredMetrics(analysis);
     
     // Show analysis immediately with rule-based optimization (fast, always works)
     if (!analysis.quality) {
@@ -1400,13 +1469,15 @@ class PromptTracer {
     // Always show rule-based optimization immediately (no waiting)
     const immediateOptimization = this.optimizer.optimizePrompt(promptText, analysis);
     promptData.setOptimizedVersion(immediateOptimization);
-    this.showAnalysis(promptData, analysis, immediateOptimization); // Show panel immediately with rule-based
+    if (this.settings.showPanel) {
+      this.showAnalysis(promptData, analysis, immediateOptimization);
+    }
     
     // Try AI optimization in background if API key exists (non-blocking)
     this.checkApiKeyStatus().then(hasApiKey => {
-      if (!hasApiKey) {
+      if (!hasApiKey || !this.settings.llmOptimization) {
         // No API key - already showing rule-based, done
-      this.storePromptData(promptData);
+        this.storePromptData(promptData);
         return;
       }
       
@@ -1490,6 +1561,8 @@ class PromptTracer {
   }
 
   storePromptData(promptData) {
+    if (!this.settings.saveHistory) return;
+
     try {
       if (!chrome || !chrome.storage || !chrome.storage.local) {
         console.warn('Extension context invalidated - cannot store prompt');
@@ -1571,13 +1644,8 @@ class PromptTracer {
       hasApiKey = false;
     }
 
-    // Calculate overall quality score (0-100)
-    // Metrics are already in 0-100 range, so no need to multiply
     const metrics = analysis.metrics || {};
-    const coreMetrics = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
-    const coreScores = coreMetrics.map(key => Math.max(0, Math.min(100, metrics[key] || 0))); // Ensure 0-100 range
-    const overallScore = Math.round(coreScores.reduce((a, b) => a + b, 0) / coreScores.length);
-    const clampedScore = Math.max(0, Math.min(100, overallScore)); // Final clamp to ensure 0-100
+    const clampedScore = getOverallScoreFromMetrics(metrics);
     
     // Determine quality level based on actual score (not just analysis.quality)
     let quality = 'developing';
@@ -1705,6 +1773,8 @@ class PromptTracer {
           </div>
         </div>
       </div>
+
+      ${this.renderCoreMetricsPanel(metrics, clampedScore, quality, config)}
 
       <!-- Compact Feedback Section (Max 2 items) -->
       <div style="padding: 16px 20px; background: #fafbfc; border-bottom: 1px solid #e5e7eb;">
@@ -2060,6 +2130,58 @@ class PromptTracer {
     this.currentOptimizedPrompt = llmOptimizedPrompt;
   }
 
+  renderCoreMetricsPanel(metrics, overallScore, quality, qualityConfig) {
+    const config = qualityConfig || { color: '#667eea', icon: '✨', label: 'Analyzing' };
+    const metricDefs = [
+      { key: 'clarity', icon: '🎯', label: 'Clarity' },
+      { key: 'specificity', icon: '📊', label: 'Specificity' },
+      { key: 'structure', icon: '📋', label: 'Structure' },
+      { key: 'context', icon: '🌍', label: 'Context' },
+      { key: 'intent', icon: '💡', label: 'Intent' },
+      { key: 'completeness', icon: '✅', label: 'Complete' }
+    ];
+
+    const bars = metricDefs.map(({ key, icon, label }) => {
+      const raw = metrics[key] || 0;
+      const value = Math.round(raw <= 1 ? raw * 100 : raw);
+      const barColor = value >= 70 ? '#4caf50' : value >= 50 ? '#ff9800' : '#f44336';
+      return `
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #6b7280;">
+            <span>${icon} ${label}</span>
+            <span style="font-weight: 700; color: ${barColor};">${value}%</span>
+          </div>
+          <div style="height: 5px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+            <div style="width: ${value}%; height: 100%; background: ${barColor}; border-radius: 3px;"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div id="prompt-tracer-metrics" style="padding: 14px 20px; background: white; border-bottom: 1px solid #e5e7eb;">
+        <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 12px;">
+          <div style="width: 56px; height: 56px; border-radius: 50%; background: conic-gradient(${config.color} ${overallScore}%, #e5e7eb 0); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <div style="width: 44px; height: 44px; border-radius: 50%; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              <span style="font-size: 16px; font-weight: 800; color: ${config.color}; line-height: 1;">${overallScore}</span>
+              <span style="font-size: 8px; color: #9ca3af; font-weight: 600;">/100</span>
+            </div>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 13px; font-weight: 700; color: #111827; display: flex; align-items: center; gap: 6px;">
+              <span>${config.icon}</span>
+              <span>${config.label} quality</span>
+            </div>
+            <div style="font-size: 11px; color: #6b7280; margin-top: 4px; line-height: 1.4;">${this.getQualityDescription(quality)}</div>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          ${bars}
+        </div>
+      </div>
+    `;
+  }
+
   renderMetrics(metrics) {
     const metricConfigs = {
       clarity: { icon: '🎯', label: 'Clarity', color: '#4caf50' },
@@ -2078,7 +2200,7 @@ class PromptTracer {
 
     return Object.entries(metrics).map(([key, value]) => {
       const config = metricConfigs[key] || { icon: '📊', label: key.charAt(0).toUpperCase() + key.slice(1), color: '#666666' };
-      const percentage = Math.round(value * 100);
+      const percentage = Math.round(value <= 1 ? value * 100 : value);
       const color = percentage >= 70 ? '#4caf50' : percentage >= 50 ? '#ff9800' : '#f44336';
       
       return `
@@ -2334,9 +2456,9 @@ class PromptTracer {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      width: 50px;
-      height: 50px;
-      background: #007bff;
+      width: 52px;
+      height: 52px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
       color: white;
       border-radius: 50%;
       display: flex;
@@ -2387,6 +2509,8 @@ class PromptTracer {
   }
 
   monitorInputField() {
+    if (!this.settings.autoAnalysis) return;
+
     // Platform-specific input field monitoring
     const selectors = {
       gpt: ['div[contenteditable="true"]', 'textarea[data-id="root"]', 'textarea[placeholder*="Message"]'],
@@ -2407,6 +2531,7 @@ class PromptTracer {
         if (trimmedValue.length >= 3 && this.currentPanel) {
           // Update quality score in real-time without full re-analysis
           const quickAnalysis = this.optimizer.analyzePrompt(trimmedValue);
+          this.updateMetricsInPanel(quickAnalysis);
           this.updatePanelInRealTime(trimmedValue, quickAnalysis);
         }
         
@@ -2571,6 +2696,26 @@ class PromptTracer {
         resolve(false);
       }
     });
+  }
+
+  updateMetricsInPanel(analysis) {
+    if (!this.currentPanel || !analysis) return;
+
+    const metrics = analysis.metrics || {};
+    const clampedScore = getOverallScoreFromMetrics(metrics);
+    let quality = analysis.quality || this.optimizer.determineQuality(metrics);
+    const qualityConfig = {
+      basic: { color: '#f44336', label: 'Basic', icon: '🌱' },
+      developing: { color: '#ff9800', label: 'Developing', icon: '🚀' },
+      good: { color: '#4caf50', label: 'Good', icon: '✨' },
+      excellent: { color: '#2196f3', label: 'Excellent', icon: '🌟' },
+      masterful: { color: '#9c27b0', label: 'Masterful', icon: '👑' }
+    };
+    const config = qualityConfig[quality] || qualityConfig.developing;
+    const metricsSection = this.currentPanel.querySelector('#prompt-tracer-metrics');
+    if (metricsSection) {
+      metricsSection.outerHTML = this.renderCoreMetricsPanel(metrics, clampedScore, quality, config).trim();
+    }
   }
 
   updateFeedbackInPanel(feedback) {

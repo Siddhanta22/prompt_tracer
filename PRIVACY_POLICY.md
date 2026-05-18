@@ -1,6 +1,6 @@
 # Privacy Policy for Prompt Tracer
 
-**Last Updated: December 2024**
+**Last Updated: May 2026**
 
 ## Overview
 
