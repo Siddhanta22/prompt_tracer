@@ -25,7 +25,7 @@
 - **Instant Rule-based**: Privacy-safe optimization that works immediately, no API key required
 - **AI-Powered Enhancement**: Optional OpenAI API integration for context-aware, natural optimizations
 - **Ready-to-Use**: Copy optimized prompts instantly with one click
-- **Context-Aware**: Understands travel, learning, creative, and technical prompts for better suggestions
+- **Targeted, Not Templated**: Only adds the specific fixes your prompt is actually missing (detail, audience, structure) — never wraps it in a generic canned paragraph
 
 ### 📊 **Advanced Analytics Dashboard**
 - **Visual Charts**: Performance trends, platform usage, and score distribution
@@ -113,18 +113,19 @@ The extension analyzes your prompt as you type and provides:
 
 *These shortcuts work on any supported AI platform when Prompt Tracer is active.*
 
-## 🎯 Context-Aware Optimization
+## 🎯 How Scoring & Optimization Actually Work
 
-The extension intelligently understands different prompt types and provides tailored optimization:
+Every prompt is graded against 5 plain-language checks, each worth 20 points — the score, the checklist, the feedback cards, and the optimizer all read from this same set, so they can never disagree with each other:
 
-- **✈️ Travel Prompts**: Destination recommendations, trip planning, travel tips
-- **📚 Learning Prompts**: Explanations, tutorials, educational content
-- **🎨 Creative Prompts**: Stories, ideas, creative projects
-- **💼 Business Prompts**: Professional communication, analysis, reports
-- **💻 Technical Prompts**: Programming, debugging, technical explanations
-- **🔍 Analysis Prompts**: Research, comparisons, investigations
+- **Enough detail** — is there substance to work with?
+- **Clear action** — is there an explicit task or question?
+- **Specific details** — concrete names, numbers, or examples instead of placeholders?
+- **Audience or context** — who is this for, and why?
+- **Structure or format** — sections, bullet points, or a requested example?
 
-Each context receives specialized optimization that avoids generic templates and provides natural, relevant improvements.
+The rule-based optimizer is strictly additive: it never rewrites, rephrases, or re-cases your original text (an earlier version did, and it was silently destroying proper nouns like "Facebook" in the process). It only appends the specific asks your prompt is missing, so the "optimized" version can never score worse than what you typed.
+
+Prompts that are genuinely open-ended (e.g. "build facebook" or "write about AI") get a distinct **"What's the Real Goal Here?"** prompt instead of just formatting suggestions — reinforcement can polish *how* a vague prompt gets answered, but it can't guess *what* you actually meant. Only you can fix that one.
 
 ## 📊 Analytics Dashboard
 
@@ -175,26 +176,26 @@ prompt_tracer/
 ### **Platform Support**
 - ✅ **ChatGPT** (chat.openai.com)
 - ✅ **Claude** (claude.ai)
-- ✅ **Grok** (x.ai)
+- ✅ **Grok** (grok.com)
 - ✅ **Gemini** (gemini.google.com)
 
 ## 🎯 Example Transformations
 
-### **Before (Basic)**
+### **Before (score: 40/100 — "Developing")**
 ```
-"write about AI"
+write about AI
 ```
 
-### **After (Excellent)**
+### **After (rule-based, no API key needed)**
 ```
-"Write a comprehensive 500-word article about artificial intelligence for beginners. Include:
-- Clear definition and explanation
-- Real-world examples and applications
-- Current trends and future implications
-- Simple language that non-technical readers can understand
+write about AI
 
-Format as a structured article with headings and bullet points."
+Additional requirements:
+- Be concrete and specific — use real details, not placeholders.
+- Structure the response with clear sections or bullet points, and include at least one concrete example.
 ```
+
+Notice the original text is untouched — the optimizer only appends what's actually missing (here: specificity and structure; this prompt already has a clear action and a stated topic). With an OpenAI API key configured, the AI-powered path rewrites more naturally instead of appending bullets, but the same rule — never make the result score worse than the input — still applies as a safety net.
 
 ## 🔧 Development
 
@@ -205,10 +206,10 @@ Format as a structured article with headings and bullet points."
 4. Test the integration
 
 ### **Extending Optimization Rules**
-1. Modify `PromptOptimizer` class in `content.js`
-2. Add new optimization functions
-3. Update the `initializeOptimizationRules()` method
-4. Test with various prompt types
+1. Modify the `PromptOptimizer` class in `content.js`
+2. Add or adjust a check in `runChecks()` — this is the single source of truth for scoring, the checklist, and feedback, so changes there propagate everywhere automatically
+3. If the check should be fixable automatically, give it a `reinforce` string; `reinforceFailedChecks()` appends it for any failing check
+4. Test with various prompt types (a corpus-style test comparing expected vs. actual checks per prompt is the fastest way to catch regressions)
 
 ### **Customizing the UI**
 1. Edit `popup.html` for popup interface
@@ -307,7 +308,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Prompt Tracer v1.0.1 is production-ready with:
 - ✅ **Real-time Contextual Feedback** with AI-powered insights
 - ✅ **Professional Analytics Dashboard** with visual charts
-- ✅ **Context-Aware Optimization** for different prompt types
+- ✅ **Consistent, Non-Destructive Optimization** that can't score worse than your original prompt
 - ✅ **Keyboard Shortcuts** for power users
 - ✅ **Achievement System** with progress tracking
 - ✅ **Comprehensive Error Handling** with graceful fallbacks
