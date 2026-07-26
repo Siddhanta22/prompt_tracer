@@ -8,15 +8,13 @@
   "homepage_url": "https://github.com/Siddhanta22/prompt_tracer",
   "permissions": [
     "activeTab",
-    "storage",
-    "scripting",
-    "downloads"
+    "storage"
   ],
   "host_permissions": [
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",
     "https://claude.ai/*",
-    "https://x.ai/*",
+    "https://grok.com/*",
     "https://gemini.google.com/*",
     "https://api.openai.com/*"
   ],
@@ -29,7 +27,7 @@
         "https://chat.openai.com/*",
         "https://chatgpt.com/*",
         "https://claude.ai/*",
-        "https://x.ai/*",
+        "https://grok.com/*",
         "https://gemini.google.com/*"
       ],
       "js": ["interactive-tutorial.js", "content.js"],
@@ -59,7 +57,7 @@
         "https://chat.openai.com/*",
         "https://chatgpt.com/*",
         "https://claude.ai/*",
-        "https://x.ai/*",
+        "https://grok.com/*",
         "https://gemini.google.com/*"
       ]
     }

@@ -138,427 +138,190 @@ class PromptMetrics {
 }
 
 class PromptOptimizer {
-  constructor() {
-    this.optimizationRules = this.initializeOptimizationRules();
+
+  // Action verbs that signal a concrete task.
+  getActionWords() {
+    return [
+      'write', 'create', 'explain', 'analyze', 'compare', 'evaluate', 'build',
+      'design', 'make', 'generate', 'summarize', 'list', 'outline', 'plan',
+      'improve', 'fix', 'debug', 'review', 'translate', 'develop', 'draft',
+      'describe', 'show', 'demonstrate', 'illustrate'
+    ];
   }
 
-  initializeOptimizationRules() {
-    return {
-      clarity: {
-        name: "Improve Clarity",
-        patterns: [
-          {
-            issue: "Run-on sentences",
-            pattern: /[^.!?]{100,}/,
-            suggestion: "Break into shorter, focused sentences"
-          },
-          {
-            issue: "Vague language",
-            pattern: /\b(good|bad|nice|interesting|stuff|things)\b/gi,
-            suggestion: "Use more specific and descriptive language"
-          },
-          {
-            issue: "Ambiguous pronouns",
-            pattern: /\b(it|this|that|these|those)\b/gi,
-            suggestion: "Replace pronouns with specific nouns for clarity"
-          }
-        ]
+  // Naming a well-known deliverable or genre — "a recipe", "a haiku", "an
+  // itinerary", "interview questions" — is itself a clear, bounded request:
+  // there's nothing left for the LLM to guess at, whether or not the
+  // sentence also has an explicit verb. Shared by clear_action (recognizing
+  // the request) and the ambiguity check (recognizing the scope is bounded)
+  // so the two can't quietly disagree about the same prompt.
+  getBoundedTopicWords() {
+    return [
+      'recipe', 'template', 'example', 'itinerary', 'questions', 'substitute',
+      'alternative', 'checklist', 'workout', 'haiku', 'poem', 'sonnet',
+      'limerick', 'tweet', 'post', 'email', 'essay', 'story', 'script',
+      'tagline', 'slogan', 'joke', 'riddle', 'resume', 'memo', 'letter'
+    ];
+  }
+
+  // The single source of truth: the score, the quality tier, the checklist
+  // shown in the panel, the feedback cards, and the optimizer's reinforcement
+  // pass all read from this one array. Nothing else computes a competing
+  // number, so "all checks pass" and "score is 100" can never disagree again.
+  runChecks(text) {
+    const trimmed = (text || '').trim();
+    const lower = trimmed.toLowerCase();
+    const words = trimmed.split(/\s+/).filter(w => w.length > 0);
+    const paragraphs = trimmed.split('\n\n').filter(p => p.trim().length > 0);
+
+    const hasActionWord = this.getActionWords().some(w => lower.includes(w));
+    // A plain "what is X" / "how does X work" is a complete, well-formed
+    // question even without a terminal "?" — people routinely drop it when
+    // typing fast into a chat box. Recognizing the WH-structure itself
+    // avoids penalizing a perfectly clear question for missing punctuation.
+    // "Best time to visit X" / "best way to do X" is an implicit question
+    // (functionally "when/how should I...") even without a WH-word.
+    const hasWhQuestion = /^(what|how|why|when|where|who|which|best)\b/i.test(trimmed);
+    // Noun-phrase requests like "pros and cons of X" or "summary of X" carry
+    // just as clear an implied action as an explicit verb — the analysis
+    // type is named directly, so treat these openers as recognized requests.
+    const hasAnalyticalNounPhrase = /^(summary|overview|pros and cons|advantages and disadvantages|comparison|difference between|differences between|analysis|review|history|breakdown|top\s+\d+)\b/i.test(trimmed);
+    // "Give me X" / "come up with X" are two of the most common ways people
+    // actually phrase a request in a chat box — as clear an ask as any verb
+    // in getActionWords(), just idiomatic rather than a single verb.
+    const hasCommonRequestPhrase = lower.includes('give me') || lower.includes('come up with');
+    // Naming a well-known deliverable ("recipe for X", "template for X",
+    // "itinerary for X") is itself the request — no separate verb needed.
+    const hasBoundedTopicWord = this.getBoundedTopicWords().some(w => lower.includes(w));
+    const hasQuestionOrRequest = trimmed.includes('?') || hasWhQuestion || hasAnalyticalNounPhrase
+      || hasCommonRequestPhrase || hasBoundedTopicWord
+      || lower.includes('please') || lower.includes('can you') || lower.includes('could you')
+      || lower.includes('help me') || lower.startsWith('help ');
+    const hasNumberOrProperNoun = /\d/.test(trimmed) || /[A-Z][a-z]+/.test(trimmed);
+    const hasSpecificWord = /\b(specific|detailed|concrete|particular|exact)\b/i.test(trimmed);
+    const hasAudienceOrPurpose = /\b(beginner|expert|professional|student|for a|for someone|goal|objective|purpose|so that|in order to)\b/i.test(lower)
+      || lower.includes(' for ') || lower.includes(' about ');
+    const hasFormatting = paragraphs.length > 1 || trimmed.includes('\n')
+      || /(^|\n)\s*[-•]/.test(trimmed) || /(^|\n)\s*\d+[.)]/.test(trimmed);
+    const hasFormatOrExampleAsk = /\b(format|list|steps|bullet|section|example|instance)\b/i.test(lower);
+
+    return [
+      {
+        id: 'substance',
+        weight: 20,
+        ok: words.length >= 8,
+        label: words.length >= 8
+          ? 'Enough detail to work with'
+          : 'Too short — add more detail about what you want',
+        reinforce: null
       },
-      specificity: {
-        name: "Add Specificity",
-        patterns: [
-          {
-            issue: "Missing context",
-            pattern: /\b(explain|describe|analyze)\b/gi,
-            suggestion: "Add specific context, examples, or constraints"
-          },
-          {
-            issue: "No target audience",
-            pattern: /^(?!.*\b(for|to|as|like)\b)/i,
-            suggestion: "Specify your target audience or expertise level"
-          },
-          {
-            issue: "No constraints or limitations",
-            pattern: /^(?!.*\b(within|limit|only|max|min)\b)/i,
-            suggestion: "Add constraints or limitations to focus the response"
-          }
-        ]
+      {
+        id: 'clear_action',
+        weight: 20,
+        ok: hasActionWord || hasQuestionOrRequest,
+        label: (hasActionWord || hasQuestionOrRequest)
+          ? 'Clear action requested'
+          : 'No clear task or action — start with a verb like "explain" or "create"',
+        reinforce: null
       },
-      structure: {
-        name: "Improve Structure",
-        patterns: [
-          {
-            issue: "No clear objective",
-            pattern: /^(?!.*\b(goal|objective|purpose|aim)\b)/i,
-            suggestion: "Start with a clear objective or goal"
-          },
-          {
-            issue: "Missing format specification",
-            pattern: /^(?!.*\b(format|output|response|answer)\b)/i,
-            suggestion: "Specify desired output format or structure"
-          },
-          {
-            issue: "No step-by-step guidance",
-            pattern: /^(?!.*\b(step|first|then|finally|process)\b)/i,
-            suggestion: "Request step-by-step guidance for complex tasks"
-          }
-        ]
+      {
+        id: 'specific_details',
+        weight: 20,
+        ok: hasNumberOrProperNoun || hasSpecificWord,
+        label: (hasNumberOrProperNoun || hasSpecificWord)
+          ? 'Includes specific details'
+          : 'No specific details — mention concrete names, numbers, or examples',
+        reinforce: 'Be concrete and specific — use real details, not placeholders.'
       },
-      engagement: {
-        name: "Enhance Engagement",
-        patterns: [
-          {
-            issue: "No examples requested",
-            pattern: /^(?!.*\b(example|instance|case|scenario)\b)/i,
-            suggestion: "Request specific examples or case studies"
-          },
-          {
-            issue: "No comparison requested",
-            pattern: /^(?!.*\b(compare|versus|vs|difference|similar)\b)/i,
-            suggestion: "Ask for comparisons to provide better context"
-          },
-          {
-            issue: "No practical application",
-            pattern: /^(?!.*\b(apply|practice|real-world|practical)\b)/i,
-            suggestion: "Request practical applications or real-world examples"
-          }
-        ]
+      {
+        id: 'audience_or_context',
+        weight: 20,
+        ok: hasAudienceOrPurpose,
+        label: hasAudienceOrPurpose
+          ? 'Audience or context given'
+          : 'No audience or context — say who this is for and why',
+        // Deliberately not "assume a non-expert audience" — that default
+        // actively hurts clearly technical asks (e.g. a React/SQL question),
+        // pushing the LLM to over-explain basics to someone who obviously
+        // already knows them. Ask it to match the depth the question already
+        // implies instead of forcing a novice-level default either way.
+        reinforce: "Match the response's depth to what the question already implies (e.g. keep it at a developer level if it uses technical terms) — state who it's for if that's genuinely unclear."
+      },
+      {
+        id: 'structure_or_format',
+        weight: 20,
+        ok: hasFormatting || hasFormatOrExampleAsk,
+        label: (hasFormatting || hasFormatOrExampleAsk)
+          ? 'Structured or asks for a specific format'
+          : 'No structure or format requested — ask for bullet points, sections, or an example',
+        reinforce: 'Structure the response with clear sections or bullet points, and include at least one concrete example.'
       }
-    };
+    ];
+  }
+
+  // Ambiguity is a different problem than a missing format ask: reinforcement
+  // (below) only ever appends generic rigor instructions, so it can polish
+  // HOW a vague prompt gets answered but can't fix WHAT the LLM has to guess
+  // at. A prompt this short, missing substance/specifics/audience all at
+  // once, is a sign the user hasn't decided the scope themselves yet — no
+  // amount of "be more specific" reinforcement resolves that, only the user
+  // actually adding real intent can.
+  isAmbiguous(text, checks) {
+    const trimmed = (text || '').trim();
+    const words = trimmed.split(/\s+/).filter(w => w.length > 0);
+
+    // "What is X" / "How does X work" is fully scoped by its own grammar —
+    // the LLM knows exactly what's being asked (define/explain X) even if
+    // the prompt is short. The scope problem is specific to broad, undefined
+    // action verbs like "build" or "make", not genuine definitional
+    // questions, so those are excluded here even though they can trip the
+    // same brevity-driven checks below.
+    // "Help me understand/learn X" and "explain/describe X" are all
+    // functionally the same ask — bounded by the named topic, not open scope.
+    const isDefinitionalQuestion = /^(what|how|why|when|where|who|which|best|explain|describe)\b/i.test(trimmed)
+      || trimmed.includes('?')
+      || /\bhelp me (understand|learn|grasp)\b/i.test(trimmed);
+    if (isDefinitionalQuestion) return false;
+
+    // "Pros and cons of X" / "summary of X" / "difference between X and Y"
+    // name the analysis type directly — just as bounded as an explicit verb.
+    const isAnalyticalNounPhrase = /^(summary|overview|pros and cons|advantages and disadvantages|comparison|difference between|differences between|analysis|review|history|breakdown|top\s+\d+)\b/i.test(trimmed);
+    if (isAnalyticalNounPhrase) return false;
+
+    // "Translate THIS sentence" / "summarize THIS article" / "fix THIS
+    // function" all point at something specific and already provided — the
+    // scope is bounded by that reference even though the sentence is short.
+    const lower = trimmed.toLowerCase();
+    const hasBoundedReference = /\b(this|that|these|those)\b/i.test(lower);
+
+    // Naming a well-known deliverable/genre ("a haiku", "an itinerary", "a
+    // recipe") bounds the task the same way — there's no real scope left
+    // for the LLM to guess at.
+    const hasGenreWord = this.getBoundedTopicWords().some(w => lower.includes(w));
+
+    if (hasBoundedReference || hasGenreWord) return false;
+
+    const byId = Object.fromEntries(checks.map(c => [c.id, c.ok]));
+    const missingCount = [byId.substance, byId.specific_details, byId.audience_or_context]
+      .filter(ok => ok === false).length;
+    return words.length <= 8 && missingCount >= 2;
   }
 
   analyzePrompt(prompt) {
-    const analysis = {
-      metrics: {},
-      insights: [],
-      suggestions: [],
-      quality: 'developing'
+    const checks = this.runChecks(prompt);
+    const score = checks.reduce((sum, c) => sum + (c.ok ? c.weight : 0), 0);
+    const quality = this.determineQuality(score);
+
+    return {
+      metrics: { overallScore: score },
+      checks,
+      quality,
+      isAmbiguous: this.isAmbiguous(prompt, checks)
     };
-    
-    // Dynamic metrics that develop as user writes
-    const metrics = this.calculateDynamicMetrics(prompt);
-    const insights = this.generateInsights(prompt, metrics);
-    const suggestions = this.generateSuggestions(prompt, metrics);
-    const quality = this.determineQuality(metrics);
-    
-    analysis.metrics = metrics;
-    analysis.insights = insights;
-    analysis.suggestions = suggestions;
-    analysis.quality = quality;
-    
-    return analysis;
   }
-  
-  calculateDynamicMetrics(promptText) {
-    const metrics = {
-      clarity: 0,
-      specificity: 0,
-      structure: 0,
-      context: 0,
-      intent: 0,
-      completeness: 0,
-      creativity: 0,
-      precision: 0,
-      engagement: 0,
-      adaptability: 0,
-      technical_quality: 0,
-      output_potential: 0
-    };
-    
-    const words = promptText.split(' ').filter(word => word.length > 0);
-    const sentences = promptText.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const paragraphs = promptText.split('\n\n').filter(p => p.trim().length > 0);
-    
-    // Clarity Score (0-100)
-    metrics.clarity = this.calculateClarityScore(promptText, words, sentences);
-    
-    // Specificity Score (0-100)
-    metrics.specificity = this.calculateSpecificityScore(promptText, words);
-    
-    // Structure Score (0-100)
-    metrics.structure = this.calculateStructureScore(promptText, sentences, paragraphs);
-    
-    // Context Score (0-100)
-    metrics.context = this.calculateContextScore(promptText, words);
-    
-    // Intent Score (0-100)
-    metrics.intent = this.calculateIntentScore(promptText, words);
-    
-    // Completeness Score (0-100)
-    metrics.completeness = this.calculateCompletenessScore(promptText, words, sentences);
-    
-    // Enhanced metrics for better analysis
-    metrics.creativity = this.calculateCreativityScore(promptText, words);
-    metrics.precision = this.calculatePrecisionScore(promptText, words);
-    metrics.engagement = this.calculateEngagementScore(promptText, words);
-    metrics.adaptability = this.calculateAdaptabilityScore(promptText, words);
-    metrics.technical_quality = this.calculateTechnicalQualityScore(promptText, words);
-    metrics.output_potential = this.calculateOutputPotentialScore(promptText, words, sentences);
-    
-    return metrics;
-  }
-  
-  calculateClarityScore(text, words, sentences) {
-    let score = 50; // Base score
-    
-    // Length analysis
-    if (words.length < 5) score -= 30;
-    else if (words.length < 15) score -= 15;
-    else if (words.length > 100) score -= 10;
-    else score += 10;
-    
-    // Sentence structure
-    const avgSentenceLength = words.length / Math.max(sentences.length, 1);
-    if (avgSentenceLength < 5) score -= 10;
-    else if (avgSentenceLength > 25) score -= 15;
-    else score += 10;
-    
-    // Readability indicators
-    if (text.includes('?')) score += 10;
-    if (text.includes('!')) score += 5;
-    if (text.includes(':')) score += 5;
-    
-    // Clarity words
-    const clarityWords = ['explain', 'describe', 'show', 'demonstrate', 'illustrate'];
-    clarityWords.forEach(word => {
-      if (text.toLowerCase().includes(word)) score += 5;
-    });
-    
-    return Math.max(0, Math.min(100, score));
-  }
-  
-  calculateSpecificityScore(text, words) {
-    let score = 30; // Base score
-    
-    // Specific words
-    const specificWords = ['specific', 'detailed', 'concrete', 'particular', 'exact'];
-    specificWords.forEach(word => {
-      if (text.toLowerCase().includes(word)) score += 10;
-    });
-    
-    // Numbers and measurements
-    const numbers = text.match(/\d+/g);
-    if (numbers) score += numbers.length * 5;
-    
-    // Named entities
-    const namedEntities = text.match(/[A-Z][a-z]+/g);
-    if (namedEntities) score += Math.min(namedEntities.length * 3, 20);
-    
-    // Technical terms
-    const technicalTerms = text.match(/\b[A-Z]{2,}\b/g);
-    if (technicalTerms) score += Math.min(technicalTerms.length * 2, 15);
-    
-    // Context words
-    const contextWords = ['for', 'about', 'regarding', 'concerning', 'related to'];
-    contextWords.forEach(word => {
-      if (text.toLowerCase().includes(word)) score += 5;
-    });
-    
-    return Math.max(0, Math.min(100, score));
-  }
-  
-  calculateStructureScore(text, sentences, paragraphs) {
-    let score = 40; // Base score
-    
-    // Paragraph structure
-    if (paragraphs.length > 1) score += 15;
-    
-    // Sentence variety
-    const questionSentences = sentences.filter(s => s.includes('?'));
-    const commandSentences = sentences.filter(s => s.includes('!'));
-    const declarativeSentences = sentences.filter(s => !s.includes('?') && !s.includes('!'));
-    
-    if (questionSentences.length > 0) score += 10;
-    if (commandSentences.length > 0) score += 5;
-    if (declarativeSentences.length > 0) score += 10;
-    
-    // Formatting indicators
-    if (text.includes('\n')) score += 10;
-    if (text.includes('-')) score += 5;
-    if (text.includes('•')) score += 5;
-    
-    // Structure words
-    const structureWords = ['first', 'second', 'finally', 'next', 'then', 'also', 'however'];
-    structureWords.forEach(word => {
-      if (text.toLowerCase().includes(word)) score += 3;
-    });
-    
-    return Math.max(0, Math.min(100, score));
-  }
-  
-  calculateContextScore(text, words) {
-    let score = 25; // Base score
-    
-    // Domain indicators
-    const domains = {
-      business: ['business', 'professional', 'company', 'industry', 'market'],
-      technical: ['code', 'programming', 'software', 'technical', 'algorithm'],
-      academic: ['research', 'study', 'analysis', 'academic', 'theoretical'],
-      creative: ['creative', 'story', 'art', 'design', 'imaginative']
-    };
-    
-    Object.entries(domains).forEach(([domain, keywords]) => {
-      keywords.forEach(keyword => {
-        if (text.toLowerCase().includes(keyword)) score += 8;
-      });
-    });
-    
-    // Audience indicators
-    const audienceWords = ['beginner', 'expert', 'professional', 'student', 'user'];
-    audienceWords.forEach(word => {
-      if (text.toLowerCase().includes(word)) score += 10;
-    });
-    
-    // Purpose indicators
-    const purposeWords = ['goal', 'objective', 'purpose', 'aim', 'target'];
-    purposeWords.forEach(word => {
-      if (text.toLowerCase().includes(word)) score += 8;
-    });
-    
-    return Math.max(0, Math.min(100, score));
-  }
-  
-  calculateIntentScore(text, words) {
-    let score = 35; // Base score
-    
-    // Action words
-    const actionWords = ['write', 'create', 'explain', 'analyze', 'compare', 'evaluate'];
-    actionWords.forEach(word => {
-      if (text.toLowerCase().includes(word)) score += 12;
-    });
-    
-    // Request indicators
-    if (text.includes('please') || text.includes('can you') || text.includes('could you')) {
-      score += 10;
-    }
-    
-    // Question indicators
-    if (text.includes('?')) score += 15;
-    
-    // Command indicators
-    if (text.includes('!')) score += 5;
-    
-    return Math.max(0, Math.min(100, score));
-  }
-  
-  calculateCompletenessScore(text, words, sentences) {
-    let score = 30; // Base score
-    
-    // Length completeness
-    if (words.length > 20) score += 15;
-    if (sentences.length > 2) score += 10;
-    
-    // Detail indicators
-    const detailWords = ['detailed', 'comprehensive', 'complete', 'thorough', 'extensive'];
-    detailWords.forEach(word => {
-      if (text.toLowerCase().includes(word)) score += 8;
-    });
-    
-    // Example indicators
-    if (text.toLowerCase().includes('example') || text.toLowerCase().includes('instance')) {
-      score += 10;
-    }
-    
-    // Format indicators
-    if (text.toLowerCase().includes('format') || text.toLowerCase().includes('style')) {
-      score += 8;
-    }
-    
-    // Constraint indicators
-    if (text.toLowerCase().includes('limit') || text.toLowerCase().includes('maximum')) {
-      score += 8;
-    }
-    
-    return Math.max(0, Math.min(100, score));
-  }
-  
-  generateInsights(text, metrics) {
-    const insights = [];
-    
-    // Overall quality insight
-    const avgScore = Object.values(metrics).reduce((a, b) => a + b, 0) / Object.keys(metrics).length;
-    if (avgScore < 30) {
-      insights.push({
-        type: 'improvement',
-        message: 'Your prompt is quite basic. Consider adding more details and context.',
-        icon: '📝'
-      });
-    } else if (avgScore < 60) {
-      insights.push({
-        type: 'development',
-        message: 'Good start! Your prompt could benefit from more structure and specificity.',
-        icon: '🚀'
-      });
-    } else {
-      insights.push({
-        type: 'excellent',
-        message: 'Well-crafted prompt! You\'re using effective prompt engineering techniques.',
-        icon: '✨'
-      });
-    }
-    
-    // Specific insights based on metrics
-    if (metrics.clarity < 40) {
-      insights.push({
-        type: 'clarity',
-        message: 'Try to be more clear and direct in your request.',
-        icon: '🎯'
-      });
-    }
-    
-    if (metrics.specificity < 40) {
-      insights.push({
-        type: 'specificity',
-        message: 'Add more specific details to get better results.',
-        icon: '📊'
-      });
-    }
-    
-    if (metrics.structure < 40) {
-      insights.push({
-        type: 'structure',
-        message: 'Organize your prompt with clear sections or bullet points.',
-        icon: '📋'
-      });
-    }
-    
-    return insights;
-  }
-  
-  generateSuggestions(text, metrics) {
-    const suggestions = [];
-    
-    // Context suggestions
-    if (metrics.context < 50) {
-      suggestions.push('Add context about your audience or domain');
-    }
-    
-    // Specificity suggestions
-    if (metrics.specificity < 50) {
-      suggestions.push('Include specific examples or constraints');
-    }
-    
-    // Structure suggestions
-    if (metrics.structure < 50) {
-      suggestions.push('Use bullet points or numbered lists for clarity');
-    }
-    
-    // Completeness suggestions
-    if (metrics.completeness < 50) {
-      suggestions.push('Specify the desired format or length');
-    }
-    
-    return suggestions;
-  }
-  
-  determineQuality(metrics) {
-    // Calculate average score from the core metrics
-    // Metrics are already in 0-100 range, so no need to multiply
-    const coreMetrics = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
-    const coreScores = coreMetrics.map(key => Math.max(0, Math.min(100, metrics[key] || 0)));
-    const avgScore = coreScores.reduce((a, b) => a + b, 0) / coreScores.length;
-    const percentage = Math.max(0, Math.min(100, avgScore)); // Clamp to 0-100
-    
+
+  determineQuality(score) {
+    const percentage = Math.max(0, Math.min(100, score));
     if (percentage < 30) return 'basic';
     if (percentage < 50) return 'developing';
     if (percentage < 70) return 'good';
@@ -566,419 +329,40 @@ class PromptOptimizer {
     return 'masterful';
   }
 
-  generateOptimizedVersion(originalPrompt, issues) {
-    let optimized = originalPrompt;
-    const improvements = [];
-
-    // Only apply improvements if there are actual issues
-    if (issues.length === 0) {
-      return {
-        prompt: originalPrompt,
-        improvements: ["No improvements needed - prompt is well-structured!"]
-      };
-    }
-
-    // Apply improvements based on identified issues
-    issues.forEach(issue => {
-      switch (issue.category) {
-        case "Improve Clarity":
-          if (issue.issue === "Run-on sentences") {
-            optimized = this.breakLongSentences(optimized);
-            improvements.push("Broke long sentences into shorter ones");
-          }
-          if (issue.issue === "Vague language") {
-            optimized = this.replaceVagueLanguage(optimized);
-            improvements.push("Replaced vague terms with specific language");
-          }
-          break;
-
-        case "Add Specificity":
-          if (issue.issue === "Missing context") {
-            optimized = this.addContext(optimized);
-            improvements.push("Added specific context and examples");
-          }
-          if (issue.issue === "No target audience") {
-            optimized = this.addTargetAudience(optimized);
-            improvements.push("Specified target audience");
-          }
-          break;
-
-        case "Improve Structure":
-          if (issue.issue === "No clear objective") {
-            optimized = this.addObjective(optimized);
-            improvements.push("Added clear objective");
-          }
-          if (issue.issue === "Missing format specification") {
-            optimized = this.addFormatSpecification(optimized);
-            improvements.push("Specified output format");
-          }
-          break;
-      }
-    });
-
-    // Only return the optimized version if it's actually different
-    if (optimized.trim() === originalPrompt.trim()) {
-      return {
-        prompt: originalPrompt,
-        improvements: ["Prompt is already well-optimized!"]
-      };
-    }
-
-    return {
-      prompt: optimized,
-      improvements: improvements
-    };
-  }
-
-  breakLongSentences(prompt) {
-    // Simple sentence breaking logic
-    return prompt.replace(/([.!?])\s+/g, '$1\n\n');
-  }
-
-  replaceVagueLanguage(prompt) {
-    const vagueReplacements = {
-      'good': 'effective',
-      'bad': 'ineffective',
-      'nice': 'well-designed',
-      'interesting': 'noteworthy',
-      'stuff': 'elements',
-      'things': 'components'
-    };
-
-    let result = prompt;
-    Object.entries(vagueReplacements).forEach(([vague, specific]) => {
-      const regex = new RegExp(`\\b${vague}\\b`, 'gi');
-      result = result.replace(regex, specific);
-    });
-
-    return result;
-  }
-
-  addContext(prompt) {
-    // Only add context for very generic requests
-    const lowerPrompt = prompt.toLowerCase();
-    if ((lowerPrompt.includes('explain') || lowerPrompt.includes('describe')) && 
-        prompt.split(' ').length < 8) {
-      return `Please provide a detailed explanation with specific examples and practical applications. ${prompt}`;
-    }
-    return prompt;
-  }
-
-  addTargetAudience(prompt) {
-    // Only add target audience for very generic requests
-    const lowerPrompt = prompt.toLowerCase();
-    if (!lowerPrompt.includes('for') && !lowerPrompt.includes('to') && 
-        !lowerPrompt.includes('as a') && !lowerPrompt.includes('from') &&
-        prompt.split(' ').length < 10) {
-      return `For someone with intermediate knowledge in this field, ${prompt}`;
-    }
-    return prompt;
-  }
-
-  addObjective(prompt) {
-    // Only add objective for very generic requests
-    const lowerPrompt = prompt.toLowerCase();
-    if (!lowerPrompt.includes('goal') && !lowerPrompt.includes('objective') && 
-        !lowerPrompt.includes('help me') && !lowerPrompt.includes('i need') &&
-        !lowerPrompt.includes('can you') && !lowerPrompt.includes('please') &&
-        prompt.split(' ').length < 8) {
-      return `My goal is to ${prompt}`;
-    }
-    return prompt;
-  }
-
-  addFormatSpecification(prompt) {
-    // Only add format for complex requests that would benefit from structure
-    const lowerPrompt = prompt.toLowerCase();
-    if (!lowerPrompt.includes('format') && !lowerPrompt.includes('output') && 
-        !lowerPrompt.includes('list') && !lowerPrompt.includes('steps') &&
-        (lowerPrompt.includes('explain') || lowerPrompt.includes('describe') || 
-         lowerPrompt.includes('analyze') || lowerPrompt.includes('compare'))) {
-      return `${prompt}\n\nPlease provide your response in a clear, structured format with bullet points or numbered lists where appropriate.`;
-    }
-    return prompt;
-  }
-
-  getPromptTemplates() {
-    return {
-      analysis: "Analyze [topic/subject] by examining [specific aspects]. Focus on [key points] and provide [type of insights].",
-      explanation: "Explain [concept] to someone with [expertise level] background. Include [specific examples] and [practical applications].",
-      comparison: "Compare [item A] and [item B] based on [criteria]. Highlight [key differences] and [similarities].",
-      recommendation: "Based on [context/situation], recommend [type of solution] that considers [constraints/requirements]."
-    };
-  }
-
-  // Simple rule-based optimization for fallback
+  // Strictly additive: the original text is never rewritten, reworded, or
+  // re-cased (that was the old bug — lowercasing the whole prompt destroyed
+  // proper nouns like "Facebook", which specificity scoring rewards). This
+  // only appends fixes for checks that are currently failing, phrased so
+  // each addition contains the exact signal its check looks for — so
+  // applying the suggestion reliably flips that check to passing.
   optimizePrompt(promptText, analysis) {
-    let optimized = promptText;
-    
-    // Basic improvements
-    if (!optimized.toLowerCase().startsWith('please')) {
-      optimized = 'Please ' + optimized.toLowerCase();
-    }
-    
-    // Add specificity if missing
-    if (optimized.length < 50) {
-      optimized += '\n\nPlease provide specific examples and detailed explanations.';
-    }
-    
-    // Add structure if missing
-    if (!optimized.includes(':') && optimized.length > 100) {
-      optimized = optimized.replace(/^(.+?)(\.|$)/, '$1:\n\n');
-    }
-    
-    // Ensure it's different from original
-    if (optimized === promptText) {
-      optimized = 'Please provide a comprehensive response about: ' + promptText.toLowerCase();
-    }
-    
-    return optimized;
+    const checks = (analysis && analysis.checks) || this.runChecks(promptText);
+    return this.reinforceFailedChecks(promptText, checks);
   }
 
-  // Enhanced calculation methods for better prompt analysis
-  
-  calculateCreativityScore(text, words) {
-    let score = 30; // Base score
-    
-    // Creative language indicators
-    const creativeWords = [
-      'innovative', 'creative', 'unique', 'original', 'imaginative', 'inspiring',
-      'breakthrough', 'revolutionary', 'cutting-edge', 'state-of-the-art',
-      'novel', 'fresh', 'dynamic', 'vibrant', 'compelling', 'engaging'
-    ];
-    
-    const creativeCount = words.filter(word => 
-      creativeWords.some(creative => word.toLowerCase().includes(creative))
-    ).length;
-    
-    score += Math.min(creativeCount * 8, 40);
-    
-    // Metaphors and analogies
-    const metaphorIndicators = ['like', 'as', 'similar to', 'reminds me of', 'imagine', 'picture'];
-    const metaphorCount = metaphorIndicators.filter(indicator => 
-      text.toLowerCase().includes(indicator)
-    ).length;
-    
-    score += Math.min(metaphorCount * 5, 20);
-    
-    // Questions that spark creativity
-    const creativeQuestions = ['what if', 'how might', 'imagine if', 'suppose', 'consider'];
-    const questionCount = creativeQuestions.filter(question => 
-      text.toLowerCase().includes(question)
-    ).length;
-    
-    score += Math.min(questionCount * 5, 10);
-    
-    return Math.min(score, 100);
-  }
+  reinforceFailedChecks(text, checks) {
+    const asks = checks.filter(c => !c.ok && c.reinforce).map(c => c.reinforce);
 
-  calculatePrecisionScore(text, words) {
-    let score = 40; // Base score
-    
-    // Specific numbers and measurements
-    const numberPattern = /\d+(\.\d+)?/g;
-    const numbers = text.match(numberPattern);
-    if (numbers) {
-      score += Math.min(numbers.length * 5, 25);
+    if (asks.length === 0) {
+      return text;
     }
-    
-    // Specific time references
-    const timeIndicators = ['today', 'yesterday', 'tomorrow', 'this week', 'next month', 'by', 'until', 'before', 'after'];
-    const timeCount = timeIndicators.filter(indicator => 
-      text.toLowerCase().includes(indicator)
-    ).length;
-    
-    score += Math.min(timeCount * 4, 15);
-    
-    // Specific locations and proper nouns
-    const properNounPattern = /[A-Z][a-z]+/g;
-    const properNouns = text.match(properNounPattern);
-    if (properNouns) {
-      score += Math.min(properNouns.length * 2, 10);
-    }
-    
-    // Technical terms and jargon (domain-specific precision)
-    const technicalTerms = ['algorithm', 'methodology', 'framework', 'protocol', 'specification', 'requirement'];
-    const technicalCount = technicalTerms.filter(term => 
-      text.toLowerCase().includes(term)
-    ).length;
-    
-    score += Math.min(technicalCount * 3, 10);
-    
-    return Math.min(score, 100);
+
+    return `${text.trim()}\n\nAdditional requirements:\n- ${asks.join('\n- ')}`;
   }
 
-  calculateEngagementScore(text, words) {
-    let score = 35; // Base score
-    
-    // Interactive elements
-    const interactiveWords = ['you', 'your', 'we', 'our', 'let\'s', 'together', 'collaborate'];
-    const interactiveCount = interactiveWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(interactiveCount * 4, 25);
-    
-    // Emotional language
-    const emotionalWords = [
-      'excited', 'thrilled', 'amazing', 'incredible', 'fantastic', 'wonderful',
-      'concerned', 'worried', 'important', 'crucial', 'critical', 'urgent',
-      'love', 'passionate', 'dedicated', 'committed', 'motivated'
-    ];
-    
-    const emotionalCount = words.filter(word => 
-      emotionalWords.some(emotional => word.toLowerCase().includes(emotional))
-    ).length;
-    
-    score += Math.min(emotionalCount * 5, 20);
-    
-    // Action-oriented language
-    const actionWords = ['create', 'build', 'develop', 'implement', 'execute', 'launch', 'achieve', 'accomplish'];
-    const actionCount = actionWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(actionCount * 3, 15);
-    
-    // Questions that engage
-    const questionCount = (text.match(/\?/g) || []).length;
-    score += Math.min(questionCount * 3, 5);
-    
-    return Math.min(score, 100);
-  }
-
-  calculateAdaptabilityScore(text, words) {
-    let score = 30; // Base score
-    
-    // Flexible language
-    const flexibleWords = ['could', 'might', 'possibly', 'perhaps', 'maybe', 'potentially', 'alternatively'];
-    const flexibleCount = flexibleWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(flexibleCount * 5, 25);
-    
-    // Multiple options presented
-    const optionIndicators = ['or', 'either', 'alternatively', 'option 1', 'option 2', 'choice'];
-    const optionCount = optionIndicators.filter(indicator => 
-      text.toLowerCase().includes(indicator)
-    ).length;
-    
-    score += Math.min(optionCount * 4, 20);
-    
-    // Conditional language
-    const conditionalWords = ['if', 'when', 'unless', 'provided that', 'assuming'];
-    const conditionalCount = conditionalWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(conditionalCount * 3, 15);
-    
-    // Scalable language
-    const scalableWords = ['scale', 'expand', 'adjust', 'modify', 'customize', 'adapt'];
-    const scalableCount = scalableWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(scalableCount * 4, 10);
-    
-    return Math.min(score, 100);
-  }
-
-  calculateTechnicalQualityScore(text, words) {
-    let score = 40; // Base score
-    
-    // Technical terminology
-    const technicalTerms = [
-      'algorithm', 'database', 'API', 'framework', 'architecture', 'optimization',
-      'performance', 'scalability', 'security', 'authentication', 'encryption',
-      'integration', 'deployment', 'configuration', 'implementation'
-    ];
-    
-    const technicalCount = technicalTerms.filter(term => 
-      text.toLowerCase().includes(term)
-    ).length;
-    
-    score += Math.min(technicalCount * 4, 30);
-    
-    // Code-related terms
-    const codeTerms = ['function', 'variable', 'class', 'method', 'parameter', 'syntax', 'debug'];
-    const codeCount = codeTerms.filter(term => 
-      text.toLowerCase().includes(term)
-    ).length;
-    
-    score += Math.min(codeCount * 3, 15);
-    
-    // Structured language
-    const structureWords = ['step', 'process', 'procedure', 'workflow', 'sequence', 'order'];
-    const structureCount = structureWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(structureCount * 2, 10);
-    
-    // Problem-solving language
-    const problemSolvingWords = ['analyze', 'diagnose', 'troubleshoot', 'resolve', 'fix', 'debug'];
-    const problemSolvingCount = problemSolvingWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(problemSolvingCount * 3, 5);
-    
-    return Math.min(score, 100);
-  }
-
-  calculateOutputPotentialScore(text, words, sentences) {
-    let score = 35; // Base score
-    
-    // Comprehensive request indicators
-    const comprehensiveWords = ['detailed', 'comprehensive', 'thorough', 'complete', 'extensive', 'in-depth'];
-    const comprehensiveCount = comprehensiveWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(comprehensiveCount * 8, 25);
-    
-    // Output format specification
-    const formatWords = ['format', 'structure', 'template', 'outline', 'list', 'table', 'chart', 'diagram'];
-    const formatCount = formatWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(formatCount * 4, 15);
-    
-    // Quality expectations
-    const qualityWords = ['high-quality', 'professional', 'expert', 'advanced', 'sophisticated', 'polished'];
-    const qualityCount = qualityWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(qualityCount * 5, 15);
-    
-    // Length and depth indicators
-    if (words.length > 50) score += 10;
-    if (sentences.length > 3) score += 5;
-    if (text.includes(':')) score += 5; // Colon indicates structured request
-    if (text.includes('\n')) score += 5; // Line breaks indicate structure
-    
-    // Specificity for better output
-    const specificWords = ['specific', 'exact', 'precise', 'particular', 'detailed'];
-    const specificCount = specificWords.filter(word => 
-      text.toLowerCase().includes(word)
-    ).length;
-    
-    score += Math.min(specificCount * 4, 10);
-    
-    return Math.min(score, 100);
-  }
 }
 
 const CORE_METRIC_KEYS = ['clarity', 'specificity', 'structure', 'context', 'intent', 'completeness'];
 
 function buildStoredMetrics(analysis) {
   const metrics = { ...(analysis?.metrics || {}) };
-  const coreScores = CORE_METRIC_KEYS.map(key => Math.max(0, Math.min(100, metrics[key] || 0)));
-  metrics.overallScore = Math.round(coreScores.reduce((a, b) => a + b, 0) / coreScores.length);
+  if (typeof metrics.overallScore !== 'number') {
+    // Backward compatibility only — the current engine always sets
+    // overallScore directly in analyzePrompt(). This path only exists in
+    // case metrics ever comes from an older shape without it.
+    const coreScores = CORE_METRIC_KEYS.map(key => Math.max(0, Math.min(100, metrics[key] || 0)));
+    metrics.overallScore = Math.round(coreScores.reduce((a, b) => a + b, 0) / coreScores.length);
+  }
   return metrics;
 }
 
@@ -997,8 +381,11 @@ class PromptTracer {
   constructor() {
     this.platform = this.detectPlatform();
     this.optimizer = new PromptOptimizer();
-    this.isCapturing = false;
     this.currentPrompt = null;
+    // Bumped every time the tracked input text actually changes. Async AI
+    // calls capture this value and check it before writing to the panel, so
+    // a slow response for stale text can never clobber a newer result.
+    this.analysisGeneration = 0;
     this.settings = {
       autoAnalysis: true,
       showPanel: true,
@@ -1167,9 +554,12 @@ class PromptTracer {
 
   setupKeyboardShortcuts() {
     document.addEventListener('keydown', (event) => {
-      // Only trigger shortcuts if not typing in an input field
-      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || 
-          event.target.contentEditable === 'true') {
+      // Deliberately no "skip if typing in an input" guard here: every
+      // shortcut below requires Ctrl+Shift, which never produces a typed
+      // character. Skipping them while focused in the compose box would
+      // disable "Quick Analysis" in the one place it's most useful — while
+      // actually writing the prompt.
+      if (!event.ctrlKey || !event.shiftKey) {
         return;
       }
 
@@ -1251,8 +641,11 @@ class PromptTracer {
 
   openDashboard() {
     // Open extension popup
-    chrome.runtime.sendMessage({ action: 'openDashboard' });
-    this.showShortcutNotification('📊 Opening dashboard...');
+    chrome.runtime.sendMessage({ action: 'openDashboard' }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.success) {
+        this.showShortcutNotification('📊 Click the Prompt Tracer icon in your toolbar to see your dashboard');
+      }
+    });
   }
 
   showKeyboardShortcutsHelp() {
@@ -1408,9 +801,12 @@ class PromptTracer {
 
     for (const selector of selectors) {
       const element = document.querySelector(selector);
-      if (element && element.value && element.value.trim()) {
-        this.capturePrompt(element.value.trim());
-        break;
+      if (element) {
+        const value = element.value || element.textContent || '';
+        if (value.trim()) {
+          this.capturePrompt(value.trim());
+          break;
+        }
       }
     }
   }
@@ -1419,15 +815,19 @@ class PromptTracer {
     // Grok specific selectors
     const selectors = [
       'textarea[placeholder*="Message"]',
+      'textarea[aria-label*="Ask"]',
       'div[contenteditable="true"]',
       'textarea'
     ];
 
     for (const selector of selectors) {
       const element = document.querySelector(selector);
-      if (element && element.value && element.value.trim()) {
-        this.capturePrompt(element.value.trim());
-        break;
+      if (element) {
+        const value = element.value || element.textContent || '';
+        if (value.trim()) {
+          this.capturePrompt(value.trim());
+          break;
+        }
       }
     }
   }
@@ -1442,37 +842,62 @@ class PromptTracer {
 
     for (const selector of selectors) {
       const element = document.querySelector(selector);
-      if (element && element.value && element.value.trim()) {
-        this.capturePrompt(element.value.trim());
-        break;
+      if (element) {
+        const value = element.value || element.textContent || '';
+        if (value.trim()) {
+          this.capturePrompt(value.trim());
+          break;
+        }
       }
     }
   }
 
   capturePrompt(promptText) {
-    // Don't analyze empty or very short prompts
-    if (!promptText || promptText.trim().length < 3 || this.isCapturing) return;
+    // Don't analyze empty or very short prompts. No time-based lockout here:
+    // the debounce timer in monitorInputField already prevents automatic
+    // spam, and analysisGeneration already prevents a slow async response
+    // from clobbering a newer one — so a manual trigger (button, shortcut)
+    // right after an automatic capture is honored immediately instead of
+    // silently doing nothing for up to a second.
+    if (!promptText || promptText.trim().length < 3) return;
     if (!this.settings.autoAnalysis) return;
 
-    this.isCapturing = true;
     console.log('Prompt Tracer: Capturing prompt:', promptText.substring(0, 50) + '...');
+
+    // Claim this analysis pass. If a newer capture starts before this one's
+    // async AI call resolves, its response gets discarded instead of
+    // overwriting the panel with stale text.
+    this.analysisGeneration += 1;
+    const generation = this.analysisGeneration;
 
     const promptData = new PromptData(promptText, this.platform);
     const analysis = this.optimizer.analyzePrompt(promptText);
     promptData.metrics = buildStoredMetrics(analysis);
-    
+
     // Show analysis immediately with rule-based optimization (fast, always works)
     if (!analysis.quality) {
-      analysis.quality = this.optimizer.determineQuality(analysis.metrics || {});
+      analysis.quality = this.optimizer.determineQuality((analysis.metrics && analysis.metrics.overallScore) || 0);
     }
-    
+
     // Always show rule-based optimization immediately (no waiting)
     const immediateOptimization = this.optimizer.optimizePrompt(promptText, analysis);
     promptData.setOptimizedVersion(immediateOptimization);
     if (this.settings.showPanel) {
-      this.showAnalysis(promptData, analysis, immediateOptimization);
+      const panelExists = this.currentPanel && document.body.contains(this.currentPanel);
+      if (panelExists) {
+        // Update the existing panel in place — no remove/rebuild, no
+        // slide-in replay. This is what actually stops the flicker.
+        this.updateMetricsInPanel(analysis);
+        const feedback = this.generateRealTimeFeedback(promptText, analysis);
+        const feedbackSection = this.currentPanel.querySelector('#prompt-tracer-feedback');
+        if (feedbackSection) feedbackSection.innerHTML = this.renderFeedbackItems(feedback);
+        this.updateOptimizedPrompt(immediateOptimization);
+      } else {
+        this.showAnalysis(promptData, analysis, immediateOptimization, generation);
+      }
+      this.fetchAIFeedback(promptText, analysis, generation);
     }
-    
+
     // Try AI optimization in background if API key exists (non-blocking)
     this.checkApiKeyStatus().then(hasApiKey => {
       if (!hasApiKey || !this.settings.llmOptimization) {
@@ -1480,7 +905,7 @@ class PromptTracer {
         this.storePromptData(promptData);
         return;
       }
-      
+
       // Has API key - try LLM optimization in background (updates panel when ready)
       // Check if extension context is valid first
       if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
@@ -1488,29 +913,40 @@ class PromptTracer {
         this.storePromptData(promptData);
         return; // Already showing rule-based, no need to update
       }
-      
+
       // Try AI optimization with shorter timeout
       const optimizationPromise = this.getLLMOptimizedPrompt(promptText, analysis);
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Optimization timeout')), 5000) // 5 second timeout
       );
-      
+
       Promise.race([optimizationPromise, timeoutPromise])
         .then(optimizedPrompt => {
           console.log('Got LLM optimized prompt, updating panel...', optimizedPrompt);
           console.log('Original:', promptText);
           console.log('Rule-based:', immediateOptimization);
           console.log('AI optimized:', optimizedPrompt);
-          
+
+          this.storePromptData(promptData);
+
+          if (generation !== this.analysisGeneration) {
+            console.log('Discarding stale AI optimization — input has changed since this request started');
+            return;
+          }
+
           // Update if we got a valid AI optimization (always update if AI succeeded)
           if (optimizedPrompt && optimizedPrompt.trim()) {
+            // Safety net: verify the AI's rewrite isn't weaker than it should
+            // be on our own rubric, and patch any still-failing check before
+            // showing it. This is what guarantees the suggested prompt never
+            // scores worse than what the user typed.
+            const candidateChecks = this.optimizer.runChecks(optimizedPrompt);
+            const finalOptimized = this.optimizer.reinforceFailedChecks(optimizedPrompt, candidateChecks);
             console.log('Updating panel with AI optimization');
-            promptData.setOptimizedVersion(optimizedPrompt);
-            this.storePromptData(promptData);
-            this.updateOptimizedPrompt(optimizedPrompt);
+            promptData.setOptimizedVersion(finalOptimized);
+            this.updateOptimizedPrompt(finalOptimized);
           } else {
             console.log('AI optimization returned empty, keeping rule-based');
-            this.storePromptData(promptData);
           }
         })
         .catch(error => {
@@ -1523,10 +959,6 @@ class PromptTracer {
       // Already showing rule-based, just store the data
       this.storePromptData(promptData);
     });
-
-    setTimeout(() => {
-      this.isCapturing = false;
-    }, 1000);
   }
 
   detectNewMessages() {
@@ -1624,7 +1056,7 @@ class PromptTracer {
     }
   }
 
-  async showAnalysis(promptData, analysis, llmOptimizedPrompt = null) {
+  async showAnalysis(promptData, analysis, llmOptimizedPrompt = null, generation = this.analysisGeneration) {
     // Don't show analysis for empty or very short prompts
     if (!promptData.prompt || promptData.prompt.trim().length < 3) {
       return;
@@ -1712,48 +1144,10 @@ class PromptTracer {
 
     // Generate real-time feedback - use rule-based immediately (fast, always works)
     let feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
-    
-    // Try AI feedback in background if available (non-blocking)
-    this.checkApiKeyStatus().then(hasApiKey => {
-      if (!hasApiKey || !chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
-        return; // No API key or invalid context, keep rule-based
-      }
-      
-      // Try AI feedback with timeout (updates when ready)
-      const aiFeedbackPromise = chrome.runtime.sendMessage({
-        action: 'generateFeedback',
-        prompt: promptData.prompt,
-        analysis: analysis
-      });
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 3000)
-      );
-      
-      Promise.race([aiFeedbackPromise, timeoutPromise])
-        .then(aiFeedbackResponse => {
-          if (aiFeedbackResponse && aiFeedbackResponse.feedback && aiFeedbackResponse.feedback.length > 0) {
-            // Update feedback with AI version
-            this.updateFeedbackInPanel(aiFeedbackResponse.feedback);
-          }
-        })
-        .catch(error => {
-          // Keep rule-based feedback, AI failed or timed out
-          console.log('AI feedback timeout/failed, keeping rule-based');
-        });
-    }).catch(error => {
-      // Keep rule-based feedback
-      console.log('Error getting AI feedback, using rule-based');
-    });
-    
-    // Limit feedback to top 2 most critical items to keep panel compact
-    const prioritizedFeedback = feedback
-      .sort((a, b) => {
-        const priority = { 'error': 3, 'warning': 2, 'info': 1 };
-        return (priority[b.type] || 0) - (priority[a.type] || 0);
-      })
-      .slice(0, 2);
 
+    // AI feedback (if a key is set) is fetched once, centrally, by
+    // capturePrompt() via fetchAIFeedback() — not duplicated here.
+    
     panel.innerHTML = `
       <!-- Compact Header -->
       <div style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 16px 20px; border-radius: 16px 16px 0 0;">
@@ -1762,7 +1156,7 @@ class PromptTracer {
             <div style="width: 32px; height: 32px; background: rgba(255,255,255,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px;">✨</div>
             <div>
               <h3 style="margin: 0; color: white; font-size: 16px; font-weight: 700;">Prompt Optimizer</h3>
-              <div style="font-size: 11px; color: rgba(255,255,255,0.9); margin-top: 2px;">AI-powered optimization</div>
+              <div style="font-size: 11px; color: rgba(255,255,255,0.9); margin-top: 2px;">${hasApiKey ? 'AI-powered optimization' : 'Rule-based optimization'}</div>
         </div>
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
@@ -1774,31 +1168,12 @@ class PromptTracer {
         </div>
       </div>
 
-      ${this.renderCoreMetricsPanel(metrics, clampedScore, quality, config)}
+      ${this.renderCoreMetricsPanel(metrics, clampedScore, quality, config, analysis.checks)}
 
-      <!-- Compact Feedback Section (Max 2 items) -->
-      <div style="padding: 16px 20px; background: #fafbfc; border-bottom: 1px solid #e5e7eb;">
-        ${prioritizedFeedback.length > 0 ? `
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            ${prioritizedFeedback.map((item, index) => `
-              <div style="background: white; border-left: 3px solid ${item.type === 'error' ? '#ef4444' : item.type === 'warning' ? '#f59e0b' : '#3b82f6'}; border-radius: 6px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                <span style="font-size: 16px; flex-shrink: 0;">${item.icon}</span>
-                <div style="flex: 1; min-width: 0;">
-                  <div style="font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 2px;">${item.title}</div>
-                  <div style="font-size: 11px; color: #6b7280; line-height: 1.4;">${item.suggestion || item.message}</div>
-              </div>
-            </div>
-            `).join('')}
-            </div>
-        ` : `
-          <div style="text-align: center; padding: 12px; background: #ecfdf5; border-radius: 8px; border: 1px solid #a7f3d0;">
-            <div style="font-size: 14px; font-weight: 600; color: #065f46; display: flex; align-items: center; justify-content: center; gap: 6px;">
-              <span>✨</span>
-              <span>Your prompt looks great!</span>
-          </div>
-            </div>
-        `}
-        </div>
+      <!-- Feedback Section -->
+      <div id="prompt-tracer-feedback" style="padding: 16px 20px; background: white; border-bottom: 1px solid #e5e7eb;">
+        ${this.renderFeedbackItems(feedback)}
+      </div>
 
       <!-- Optimized Prompt (Main Focus - Always Visible) -->
       <div style="padding: 20px; background: white; flex: 1; overflow-y: auto;">
@@ -1868,9 +1243,11 @@ class PromptTracer {
             return;
           }
           // Open extension popup to settings tab
-          chrome.runtime.sendMessage({ action: 'openSettings' });
-          // Also show a notification
-          this.showShortcutNotification('⚙️ Opening settings...');
+          chrome.runtime.sendMessage({ action: 'openSettings' }, (response) => {
+            if (chrome.runtime.lastError || !response || !response.success) {
+              this.showShortcutNotification('⚙️ Click the Prompt Tracer icon in your toolbar to open settings');
+            }
+          });
         } catch (error) {
           console.error('Error opening settings:', error);
           this.showShortcutNotification('⚠️ Please reload the extension', 'warning');
@@ -2050,16 +1427,6 @@ class PromptTracer {
       });
     }
     
-    // Add "Open Settings" button functionality (fallback)
-    const openSettingsButton = panel.querySelector('#open-settings');
-    if (openSettingsButton) {
-      openSettingsButton.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ action: 'openSettings' });
-        panel.style.animation = 'slideIn 0.3s ease-out reverse';
-        setTimeout(() => panel.remove(), 300);
-      });
-    }
-
     // Add "Use This Prompt" button functionality
     const useButton = panel.querySelector('#use-optimized');
     if (useButton) {
@@ -2070,7 +1437,7 @@ class PromptTracer {
         const selectors = {
           gpt: ['div[contenteditable="true"]', 'textarea[data-id="root"]', 'textarea[placeholder*="Message"]'],
           claude: ['div[contenteditable="true"]', 'textarea[placeholder*="Message"]'],
-          grok: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]'],
+          grok: ['textarea[placeholder*="Message"]', 'textarea[aria-label*="Ask"]', 'div[contenteditable="true"]', 'textarea'],
           gemini: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]']
         };
         
@@ -2130,33 +1497,14 @@ class PromptTracer {
     this.currentOptimizedPrompt = llmOptimizedPrompt;
   }
 
-  renderCoreMetricsPanel(metrics, overallScore, quality, qualityConfig) {
+  renderCoreMetricsPanel(metrics, overallScore, quality, qualityConfig, checks) {
     const config = qualityConfig || { color: '#667eea', icon: '✨', label: 'Analyzing' };
-    const metricDefs = [
-      { key: 'clarity', icon: '🎯', label: 'Clarity' },
-      { key: 'specificity', icon: '📊', label: 'Specificity' },
-      { key: 'structure', icon: '📋', label: 'Structure' },
-      { key: 'context', icon: '🌍', label: 'Context' },
-      { key: 'intent', icon: '💡', label: 'Intent' },
-      { key: 'completeness', icon: '✅', label: 'Complete' }
-    ];
-
-    const bars = metricDefs.map(({ key, icon, label }) => {
-      const raw = metrics[key] || 0;
-      const value = Math.round(raw <= 1 ? raw * 100 : raw);
-      const barColor = value >= 70 ? '#4caf50' : value >= 50 ? '#ff9800' : '#f44336';
-      return `
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #6b7280;">
-            <span>${icon} ${label}</span>
-            <span style="font-weight: 700; color: ${barColor};">${value}%</span>
-          </div>
-          <div style="height: 5px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
-            <div style="width: ${value}%; height: 100%; background: ${barColor}; border-radius: 3px;"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
+    const checklist = (checks || []).map(({ ok, label }) => `
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: ${ok ? '#111827' : '#6b7280'};">
+        <span style="flex-shrink: 0;">${ok ? '✅' : '⬜️'}</span>
+        <span>${label}</span>
+      </div>
+    `).join('');
 
     return `
       <div id="prompt-tracer-metrics" style="padding: 14px 20px; background: white; border-bottom: 1px solid #e5e7eb;">
@@ -2175,9 +1523,46 @@ class PromptTracer {
             <div style="font-size: 11px; color: #6b7280; margin-top: 4px; line-height: 1.4;">${this.getQualityDescription(quality)}</div>
           </div>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          ${bars}
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          ${checklist}
         </div>
+      </div>
+    `;
+  }
+
+  // Shared by the initial render and both live-update paths so the feedback
+  // section never drifts into a different visual style depending on how it
+  // was last refreshed.
+  renderFeedbackItems(feedback) {
+    const prioritized = (feedback || [])
+      .sort((a, b) => {
+        const priority = { error: 3, warning: 2, info: 1 };
+        return (priority[b.type] || 0) - (priority[a.type] || 0);
+      })
+      .slice(0, 2);
+
+    if (prioritized.length === 0) {
+      return `
+        <div style="text-align: center; padding: 12px; background: #ecfdf5; border-radius: 8px; border: 1px solid #a7f3d0;">
+          <div style="font-size: 14px; font-weight: 600; color: #065f46; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>✨</span>
+            <span>Your prompt looks great!</span>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        ${prioritized.map(item => `
+          <div style="display: flex; align-items: flex-start; gap: 10px; padding-left: 10px; border-left: 3px solid ${item.type === 'error' ? '#ef4444' : item.type === 'warning' ? '#f59e0b' : '#3b82f6'};">
+            <span style="font-size: 15px; flex-shrink: 0;">${item.icon}</span>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 2px;">${item.title}</div>
+              <div style="font-size: 11px; color: #6b7280; line-height: 1.4;">${item.suggestion || item.message}</div>
+            </div>
+          </div>
+        `).join('')}
       </div>
     `;
   }
@@ -2425,29 +1810,6 @@ class PromptTracer {
     }
   }
 
-  handleOptimizationError(error, originalPrompt) {
-    console.error('Optimization error:', error);
-    
-    let errorMessage = 'Failed to optimize prompt. ';
-    let suggestion = 'Try refreshing the page or check your internet connection.';
-    
-    if (error.message.includes('API key')) {
-      errorMessage += 'API key issue. ';
-      suggestion = 'Check your API key in the extension settings.';
-    } else if (error.message.includes('network')) {
-      errorMessage += 'Network error. ';
-      suggestion = 'Check your internet connection and try again.';
-    } else if (error.message.includes('quota')) {
-      errorMessage += 'API quota exceeded. ';
-      suggestion = 'Check your API usage limits or try again later.';
-    }
-    
-    this.showErrorNotification(`${errorMessage}${suggestion}`, 'warning', 8000);
-    
-    // Fallback to rule-based optimization
-    return this.smartFallbackOptimization(originalPrompt, {});
-  }
-
   injectUI() {
     // Add a floating button to manually trigger analysis
     const button = document.createElement('div');
@@ -2515,145 +1877,117 @@ class PromptTracer {
     const selectors = {
       gpt: ['div[contenteditable="true"]', 'textarea[data-id="root"]', 'textarea[placeholder*="Message"]'],
       claude: ['div[contenteditable="true"]', 'textarea[placeholder*="Message"]'],
-      grok: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]'],
+      grok: ['textarea[placeholder*="Message"]', 'textarea[aria-label*="Ask"]', 'div[contenteditable="true"]', 'textarea'],
       gemini: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]']
     };
 
     const platformSelectors = selectors[this.platform] || selectors.gpt;
-    
+
     for (const selector of platformSelectors) {
       const element = document.querySelector(selector);
-      if (element) {
-        const currentValue = element.value || element.textContent || '';
-        const trimmedValue = currentValue.trim();
-        
-        // Real-time updates for existing panel
-        if (trimmedValue.length >= 3 && this.currentPanel) {
-          // Update quality score in real-time without full re-analysis
-          const quickAnalysis = this.optimizer.analyzePrompt(trimmedValue);
-          this.updateMetricsInPanel(quickAnalysis);
-          this.updatePanelInRealTime(trimmedValue, quickAnalysis);
-        }
-        
-        // Only do full analysis if there's meaningful content and it changed significantly
-        if (trimmedValue.length >= 3 && trimmedValue !== this.lastMonitoredValue) {
-          // Only re-analyze if the change is significant (more than just a few characters)
-          const significantChange = !this.lastMonitoredValue || 
-            Math.abs(trimmedValue.length - this.lastMonitoredValue.length) > 5 ||
-            !trimmedValue.startsWith(this.lastMonitoredValue.substring(0, Math.min(10, this.lastMonitoredValue.length)));
-          
-          if (significantChange) {
-            this.lastMonitoredValue = trimmedValue;
-            console.log('Auto-detected prompt change:', trimmedValue.substring(0, 50) + '...');
-            this.capturePrompt(trimmedValue);
-          break;
-        }
-      }
-        
-        // If field is empty, clear the last monitored value
-        if (trimmedValue.length === 0 && this.lastMonitoredValue) {
+      if (!element) continue;
+
+      const currentValue = element.value || element.textContent || '';
+      const trimmedValue = currentValue.trim();
+
+      if (trimmedValue.length === 0) {
+        if (this.lastMonitoredValue) {
           this.lastMonitoredValue = '';
-          // Hide analysis panel if it exists
+          clearTimeout(this.debounceTimer);
           const existingPanel = document.getElementById('prompt-tracer-panel');
-          if (existingPanel) {
-            existingPanel.remove();
-          }
+          if (existingPanel) existingPanel.remove();
           this.currentPanel = null;
         }
+        break;
       }
+
+      if (trimmedValue.length >= 3 && trimmedValue !== this.lastMonitoredValue) {
+        this.lastMonitoredValue = trimmedValue;
+        // Debounce: wait for a pause in typing before re-analyzing, instead
+        // of reacting to every keystroke. This is what was making the panel
+        // feel "shaky" — it was rebuilding on almost every character typed.
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => {
+          this.capturePrompt(trimmedValue);
+        }, 700);
+      }
+
+      break;
     }
   }
 
+  // Derived from the exact same checks array that drives the score and the
+  // checklist UI, so feedback can never disagree with what the panel shows
+  // above it (that mismatch was the whole reason "all checks pass" and
+  // "score is 65" used to coexist).
   generateRealTimeFeedback(promptText, analysis) {
     const feedback = [];
-    const metrics = analysis.metrics || {};
-    const words = promptText.split(' ').filter(w => w.length > 0);
+    const checks = (analysis && analysis.checks) || this.optimizer.runChecks(promptText);
     const lowerPrompt = promptText.toLowerCase();
-    
-    // Check for specific issues and provide actionable feedback
-    if (words.length < 5) {
+
+    const iconById = {
+      substance: '📝',
+      clear_action: '🎯',
+      specific_details: '📊',
+      audience_or_context: '🌍',
+      structure_or_format: '📋'
+    };
+    const titleById = {
+      substance: 'Too Short',
+      clear_action: 'Unclear Intent',
+      specific_details: 'Too Vague',
+      audience_or_context: 'Missing Context',
+      structure_or_format: 'Could Be Better Organized'
+    };
+
+    checks.filter(c => !c.ok).forEach(check => {
       feedback.push({
+        type: check.id === 'substance' ? 'error' : 'warning',
+        icon: iconById[check.id] || '💡',
+        title: titleById[check.id] || check.label,
+        message: check.label,
+        suggestion: check.reinforce || undefined
+      });
+    });
+
+    // A prompt this short and this underspecified isn't a formatting
+    // problem — no amount of "be more specific" reinforcement can guess
+    // what you actually mean. Surface that distinctly, and put it first:
+    // it's a more fundamental issue than anything the checklist covers.
+    if (analysis && analysis.isAmbiguous) {
+      feedback.unshift({
         type: 'error',
-        icon: '📝',
-        title: 'Too Short',
-        message: 'Your prompt is very brief. Longer prompts usually get better, more detailed responses.',
-        suggestion: 'Add more context about what you want to know or achieve.'
+        icon: '❓',
+        title: 'What\'s the Real Goal Here?',
+        message: 'This is short enough that the AI would have to guess at what you actually want — reinforcement can\'t fix that, only you can.',
+        suggestion: 'Add a sentence about the specific goal, scope, or use case — e.g. what this is for and who it\'s for.'
       });
     }
-    
-    if (metrics.clarity < 50) {
-      feedback.push({
-        type: 'warning',
-        icon: '🎯',
-        title: 'Unclear Request',
-        message: 'Your prompt could be clearer. The AI might not understand exactly what you need.',
-        suggestion: 'Use specific action words like "explain", "compare", "create", or "analyze".'
-      });
-    }
-    
-    if (metrics.specificity < 50) {
-      feedback.push({
-        type: 'warning',
-        icon: '📊',
-        title: 'Too Vague',
-        message: 'Your prompt lacks specific details. More specific prompts get better results.',
-        suggestion: 'Add details like: who is this for, what format you want, any constraints or preferences.'
-      });
-    }
-    
-    if (metrics.context < 50 && !lowerPrompt.includes('for') && !lowerPrompt.includes('about')) {
-      feedback.push({
-        type: 'info',
-        icon: '🌍',
-        title: 'Missing Context',
-        message: 'Adding context helps the AI provide more relevant responses.',
-        suggestion: 'Specify your audience (e.g., "for beginners"), domain, or use case.'
-      });
-    }
-    
-    if (metrics.structure < 50 && words.length > 10 && !promptText.includes('\n') && !promptText.includes(':')) {
-      feedback.push({
-        type: 'info',
-        icon: '📋',
-        title: 'Could Be Better Organized',
-        message: 'Structured prompts with clear sections often get better organized responses.',
-        suggestion: 'Use bullet points, numbered lists, or separate your request into clear parts.'
-      });
-    }
-    
-    if (metrics.intent < 50 && !lowerPrompt.includes('please') && !lowerPrompt.includes('can you') && !lowerPrompt.includes('?')) {
-      feedback.push({
-        type: 'info',
-        icon: '🎯',
-        title: 'Unclear Intent',
-        message: 'It\'s not clear what action you want the AI to take.',
-        suggestion: 'Start with action words: "Explain...", "Create...", "Compare...", "Help me..."'
-      });
-    }
-    
-    // Check for common issues
+
+    // A couple of extra, cheap heuristics that don't factor into scoring but
+    // are worth flagging when they show up.
+    const words = promptText.split(' ').filter(w => w.length > 0);
     if (lowerPrompt.includes('tell me') && words.length < 8) {
       feedback.push({
-        type: 'warning',
+        type: 'info',
         icon: '💬',
         title: 'Generic Request',
         message: '"Tell me" is quite generic. Be more specific about what you want to learn.',
         suggestion: 'Instead of "Tell me about X", try "Explain X in simple terms" or "What are the key aspects of X?"'
       });
     }
-    
-    if (lowerPrompt.includes('best') || lowerPrompt.includes('good') || lowerPrompt.includes('nice')) {
-      if (!lowerPrompt.includes('why') && !lowerPrompt.includes('criteria') && !lowerPrompt.includes('compare')) {
-        feedback.push({
-          type: 'info',
-          icon: '⭐',
-          title: 'Subjective Terms',
-          message: 'Words like "best" or "good" are subjective. The AI needs criteria to judge.',
-          suggestion: 'Add what makes it "best" for you: budget, location, features, etc.'
-        });
-      }
+
+    if ((lowerPrompt.includes('best') || lowerPrompt.includes('good') || lowerPrompt.includes('nice')) &&
+        !lowerPrompt.includes('why') && !lowerPrompt.includes('criteria') && !lowerPrompt.includes('compare')) {
+      feedback.push({
+        type: 'info',
+        icon: '⭐',
+        title: 'Subjective Terms',
+        message: 'Words like "best" or "good" are subjective. The AI needs criteria to judge.',
+        suggestion: 'Add what makes it "best" for you: budget, location, features, etc.'
+      });
     }
-    
+
     return feedback;
   }
 
@@ -2703,7 +2037,7 @@ class PromptTracer {
 
     const metrics = analysis.metrics || {};
     const clampedScore = getOverallScoreFromMetrics(metrics);
-    let quality = analysis.quality || this.optimizer.determineQuality(metrics);
+    let quality = analysis.quality || this.optimizer.determineQuality(clampedScore);
     const qualityConfig = {
       basic: { color: '#f44336', label: 'Basic', icon: '🌱' },
       developing: { color: '#ff9800', label: 'Developing', icon: '🚀' },
@@ -2714,109 +2048,53 @@ class PromptTracer {
     const config = qualityConfig[quality] || qualityConfig.developing;
     const metricsSection = this.currentPanel.querySelector('#prompt-tracer-metrics');
     if (metricsSection) {
-      metricsSection.outerHTML = this.renderCoreMetricsPanel(metrics, clampedScore, quality, config).trim();
+      metricsSection.outerHTML = this.renderCoreMetricsPanel(metrics, clampedScore, quality, config, analysis.checks).trim();
     }
   }
 
   updateFeedbackInPanel(feedback) {
     if (!this.currentPanel || !feedback || feedback.length === 0) return;
-    
-    // Find the feedback section in the compact panel
-    const feedbackSection = this.currentPanel.querySelector('[style*="padding: 16px 20px; background: #fafbfc"]');
+
+    const feedbackSection = this.currentPanel.querySelector('#prompt-tracer-feedback');
     if (!feedbackSection) return;
-    
-    // Limit to top 2 most critical items
-    const prioritizedFeedback = feedback
-      .sort((a, b) => {
-        const priority = { 'error': 3, 'warning': 2, 'info': 1 };
-        return (priority[b.type] || 0) - (priority[a.type] || 0);
-      })
-      .slice(0, 2);
-    
-    // Update the feedback section
-    feedbackSection.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        ${prioritizedFeedback.map((item, index) => `
-          <div style="background: white; border-left: 3px solid ${item.type === 'error' ? '#ef4444' : item.type === 'warning' ? '#f59e0b' : '#3b82f6'}; border-radius: 6px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-            <span style="font-size: 16px; flex-shrink: 0;">${item.icon}</span>
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 2px;">${item.title}</div>
-              <div style="font-size: 11px; color: #6b7280; line-height: 1.4;">${item.suggestion || item.message}</div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `;
+
+    feedbackSection.innerHTML = this.renderFeedbackItems(feedback);
   }
 
-  async updatePanelInRealTime(promptText, analysis) {
-    if (!this.currentPanel) return;
-    
-    // Generate fresh feedback - use rule-based immediately (fast, always works)
-    let feedback = this.generateRealTimeFeedback(promptText, analysis);
-    
-    // Try AI feedback in background if available (non-blocking)
-    try {
-      const hasApiKey = await this.checkApiKeyStatus();
-      if (hasApiKey && chrome && chrome.runtime && chrome.runtime.sendMessage) {
-        // Try AI feedback with timeout
-        const aiFeedbackPromise = chrome.runtime.sendMessage({
-          action: 'generateFeedback',
-          prompt: promptText,
-          analysis: analysis
-        });
-        
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 3000)
-        );
-        
-        try {
-          const aiFeedbackResponse = await Promise.race([aiFeedbackPromise, timeoutPromise]);
-          if (aiFeedbackResponse && aiFeedbackResponse.feedback && aiFeedbackResponse.feedback.length > 0) {
-            feedback = aiFeedbackResponse.feedback;
+  // Single, centralized AI-feedback fetch — called once per capturePrompt()
+  // pass, whether that pass built a new panel or updated an existing one.
+  fetchAIFeedback(promptText, analysis, generation) {
+    this.checkApiKeyStatus().then(hasApiKey => {
+      if (!hasApiKey || !chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+        return;
+      }
+
+      const aiFeedbackPromise = chrome.runtime.sendMessage({
+        action: 'generateFeedback',
+        prompt: promptText,
+        analysis: analysis
+      });
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 3000)
+      );
+
+      Promise.race([aiFeedbackPromise, timeoutPromise])
+        .then(aiFeedbackResponse => {
+          if (generation !== this.analysisGeneration) {
+            console.log('Discarding stale AI feedback — input has changed since this request started');
+            return;
           }
-        } catch (error) {
-          // Keep rule-based feedback, AI failed or timed out
-          console.log('AI feedback timeout/failed, using rule-based');
-        }
-      }
-    } catch (error) {
-      // Keep rule-based feedback
-      console.log('Error getting AI feedback, using rule-based');
-    }
-    
-    // Update feedback section
-    const feedbackSection = this.currentPanel.querySelector('[style*="What to Improve"]')?.parentElement;
-    if (feedbackSection) {
-      if (feedback.length > 0) {
-        feedbackSection.innerHTML = `
-          <h4 style="margin: 0 0 12px 0; color: #333; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-            <span>🎯</span>
-            <span>What to Improve</span>
-          </h4>
-          <div style="display: flex; flex-direction: column; gap: 10px;">
-            ${feedback.map((item, index) => `
-              <div style="background: ${item.type === 'error' ? '#fff5f5' : item.type === 'warning' ? '#fffbf0' : '#f0f9ff'}; border-left: 4px solid ${item.type === 'error' ? '#f44336' : item.type === 'warning' ? '#ff9800' : '#2196f3'}; border-radius: 8px; padding: 12px; display: flex; align-items: flex-start; gap: 10px;">
-                <span style="font-size: 18px; margin-top: 2px;">${item.icon}</span>
-                <div style="flex: 1;">
-                  <div style="font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px;">${item.title}</div>
-                  <div style="font-size: 12px; color: #666; line-height: 1.5;">${item.message}</div>
-                  ${item.suggestion ? `<div style="font-size: 12px; color: #667eea; margin-top: 6px; font-weight: 500;">💡 ${item.suggestion}</div>` : ''}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `;
-      } else {
-        feedbackSection.innerHTML = `
-          <div style="text-align: center; padding: 20px; background: #f0f9ff; border-radius: 12px; border: 1px solid #b3e5fc;">
-            <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
-            <div style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 4px;">Great prompt!</div>
-            <div style="font-size: 12px; color: #666;">Your prompt looks good. The optimized version below will make it even better.</div>
-          </div>
-        `;
-      }
-    }
+          if (aiFeedbackResponse && aiFeedbackResponse.feedback && aiFeedbackResponse.feedback.length > 0) {
+            this.updateFeedbackInPanel(aiFeedbackResponse.feedback);
+          }
+        })
+        .catch(error => {
+          console.log('AI feedback timeout/failed, keeping rule-based:', error.message);
+        });
+    }).catch(error => {
+      console.log('Error checking API key status for feedback, keeping rule-based:', error);
+    });
   }
 
   updateOptimizedPrompt(optimizedPrompt) {
@@ -2836,17 +2114,6 @@ class PromptTracer {
       // Update existing optimized prompt text
       optimizedTextElement.textContent = optimizedPrompt;
       console.log('Updated existing optimized prompt text');
-      
-      // Update the AI-powered indicator if it exists
-      const aiIndicator = this.currentPanel.querySelector('[style*="AI-powered optimization"]');
-      if (aiIndicator && !aiIndicator.textContent.includes('AI-powered')) {
-        aiIndicator.innerHTML = `
-          <div style="margin-top: 8px; text-align: center; font-size: 10px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
-            <span>🤖</span>
-            <span>AI-powered optimization</span>
-          </div>
-        `;
-      }
     } else if (loadingSection) {
       // Replace loading section with optimized prompt
       loadingSection.outerHTML = `
@@ -2882,17 +2149,6 @@ class PromptTracer {
       if (existingText) {
         existingText.textContent = optimizedPrompt;
         console.log('Updated existing optimized prompt in section');
-        
-        // Update AI indicator
-        const aiIndicator = optimizedSection.querySelector('[style*="AI-powered"]');
-        if (aiIndicator) {
-          aiIndicator.innerHTML = `
-            <div style="margin-top: 8px; text-align: center; font-size: 10px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
-              <span>🤖</span>
-              <span>AI-powered optimization</span>
-            </div>
-          `;
-        }
       }
     } else {
       console.log('Could not find optimized prompt section to update');
@@ -2926,7 +2182,7 @@ class PromptTracer {
         const selectors = {
           gpt: ['div[contenteditable="true"]', 'textarea[data-id="root"]', 'textarea[placeholder*="Message"]'],
           claude: ['div[contenteditable="true"]', 'textarea[placeholder*="Message"]'],
-          grok: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]'],
+          grok: ['textarea[placeholder*="Message"]', 'textarea[aria-label*="Ask"]', 'div[contenteditable="true"]', 'textarea'],
           gemini: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]']
         };
         
@@ -2983,50 +2239,23 @@ class PromptTracer {
       ]);
       
       console.log('Background script response:', response);
-      
+
       if (response && response.optimized && response.optimized !== originalPrompt) {
         console.log('LLM optimization successful using:', response.method);
         return response.optimized;
-      } else {
-        console.log('LLM optimization returned invalid result, using fallback');
-        throw new Error('Invalid optimization result');
       }
-    } catch (error) {
-      console.log('LLM optimization failed, using fallback:', error.message);
-      // Use smart fallback as backup
-      return this.smartFallbackOptimization(originalPrompt, analysis);
-    }
-  }
 
-  smartFallbackOptimization(originalPrompt, analysis) {
-    console.log('Using smart fallback optimization');
-    const lowerPrompt = originalPrompt.toLowerCase();
-    let optimized = originalPrompt;
-    
-    // Context-aware optimization based on prompt content - NO GENERIC TEMPLATES
-    if (lowerPrompt.includes('explain') || lowerPrompt.includes('what is') || lowerPrompt.includes('tell me about')) {
-      const topic = originalPrompt.replace(/explain|what is|tell me about/gi, '').trim();
-      optimized = `Please explain ${topic} in a clear and engaging way. I'd like to understand what it is, why it matters, key concepts, and real-world examples. Make it accessible and interesting.`;
-    } else if (lowerPrompt.includes('trip') || lowerPrompt.includes('travel') || lowerPrompt.includes('vacation') || lowerPrompt.includes('destination') || lowerPrompt.includes('beach')) {
-      optimized = `I'm planning a trip and need recommendations. Please suggest specific destinations with details about best time to visit, activities and attractions, accommodation options, and travel tips. Include both popular spots and hidden gems.`;
-    } else if (lowerPrompt.includes('movie') || lowerPrompt.includes('film') || lowerPrompt.includes('watch') || lowerPrompt.includes('entertainment')) {
-      optimized = `I'm looking for entertainment recommendations. Please suggest specific titles with brief descriptions, why they're worth watching, where to find them, and similar recommendations if I enjoy these.`;
-    } else if (lowerPrompt.includes('idea') || lowerPrompt.includes('suggest') || lowerPrompt.includes('recommend')) {
-      const topic = originalPrompt.replace(/give me|ideas for|suggest|recommend/gi, '').trim();
-      optimized = `I need creative and practical ideas related to ${topic}. Please provide specific suggestions with details about implementation, benefits, and any considerations I should know about.`;
-    } else if (lowerPrompt.includes('how to') || lowerPrompt.includes('guide') || lowerPrompt.includes('steps')) {
-      const task = originalPrompt.replace(/how to|guide|steps/gi, '').trim();
-      optimized = `I need guidance on how to ${task}. Please provide clear, practical steps with explanations, tips for success, and things to watch out for.`;
-    } else if (lowerPrompt.includes('write') || lowerPrompt.includes('create') || lowerPrompt.includes('generate')) {
-      optimized = `I need help ${originalPrompt.toLowerCase()}. Please provide guidance on how to approach this, key elements to include, and tips for making it effective.`;
-    } else if (lowerPrompt.includes('compare')) {
-      optimized = `I'd like to compare the topics mentioned. Please provide a helpful comparison with key differences, similarities, pros and cons, and when each option might be best.`;
-    } else {
-      // Natural, conversational improvement - NO TEMPLATE
-      optimized = `I'd like to learn more about ${originalPrompt}. Please provide a helpful response that covers the key aspects, practical information, and anything else that would be useful to know about this topic.`;
+      // No usable AI result — return null and let the caller keep showing
+      // the rule-based version that's already on screen. There is
+      // deliberately no local template fallback here: a fixed "if the
+      // prompt mentions X, wrap it in this canned paragraph" generator is
+      // exactly the hardcoded behavior this tool should never produce.
+      console.log('No AI optimization available, keeping rule-based version');
+      return null;
+    } catch (error) {
+      console.log('LLM optimization unavailable, keeping rule-based version:', error.message);
+      return null;
     }
-    
-    return optimized;
   }
 
 

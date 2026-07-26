@@ -58,7 +58,7 @@ class PromptTracerCharts {
     // Create area under the line
     const areaPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     const areaPoints = `${margin.left},${height - margin.bottom} L ${points} L ${margin.left + (data.length - 1) * xScale},${height - margin.bottom} Z`;
-    areaPath.setAttribute('d', areaPath);
+    areaPath.setAttribute('d', `M ${areaPoints}`);
     areaPath.setAttribute('fill', `url(#gradient)`);
     areaPath.setAttribute('opacity', '0.3');
 
