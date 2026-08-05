@@ -17,10 +17,22 @@ function normalizePromptScore(metrics) {
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize tabs
     initializeTabs();
-    
+
+    // If the panel's settings gear asked to open straight to a specific
+    // tab (chrome.action.openPopup() has no way to pass this itself),
+    // honor it once and clear the flag so future normal opens still
+    // default to Dashboard.
+    chrome.storage.local.get(['openToTab'], (result) => {
+        if (result.openToTab) {
+            const targetTab = document.querySelector(`.tab[data-tab="${result.openToTab}"]`);
+            if (targetTab) targetTab.click();
+            chrome.storage.local.remove(['openToTab']);
+        }
+    });
+
     // Load data
     loadData();
-    
+
     // Set up event listeners
     setupEventListeners();
 });

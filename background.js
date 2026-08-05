@@ -11,6 +11,31 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+// Note: chrome.action.openPopup() can silently do nothing (no popup opens)
+// without throwing — most commonly when called from a background handler
+// relaying a content-script click, which doesn't always carry the genuine
+// user-activation context the API requires. There's no MV3-service-worker
+// API to verify a popup view actually opened (chrome.extension.getViews
+// isn't available here), so "didn't throw" is the best signal available.
+// content.js's caller already has an honest fallback toast for the case
+// where this reports failure.
+function openPopup(sendResponse, extraStorage) {
+  const finish = () => {
+    try {
+      chrome.action.openPopup();
+      sendResponse({ success: true });
+    } catch (error) {
+      console.error('Open popup error:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  };
+  if (extraStorage) {
+    chrome.storage.local.set(extraStorage, finish);
+  } else {
+    finish();
+  }
+}
+
 // Handle messages from content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
@@ -31,22 +56,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       return true;
     case 'openSettings':
-      try {
-        chrome.action.openPopup();
-        sendResponse({ success: true });
-      } catch (error) {
-        console.error('Open settings error:', error);
-        sendResponse({ success: false, error: error.message });
-      }
+      // chrome.action.openPopup() has no way to pass which tab to show —
+      // popup.html always starts on Dashboard. Leave a flag popup.js reads
+      // on load and clears, so "Open Settings" actually opens Settings.
+      openPopup(sendResponse, { openToTab: 'settings' });
       return true;
     case 'openDashboard':
-      try {
-        chrome.action.openPopup();
-        sendResponse({ success: true });
-      } catch (error) {
-        console.error('Open dashboard error:', error);
-        sendResponse({ success: false, error: error.message });
-      }
+      openPopup(sendResponse);
       return true;
     case 'generateFeedback':
       generateAIFeedback(request.prompt)
