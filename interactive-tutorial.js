@@ -94,7 +94,7 @@ class InteractiveTutorial {
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.6);
       z-index: 1000000;
       display: flex;
       align-items: center;
@@ -104,14 +104,15 @@ class InteractiveTutorial {
 
     const modal = document.createElement('div');
     modal.style.cssText = `
-      background: white;
-      border-radius: 16px;
+      background: var(--pt-bg, white);
+      color: var(--pt-text-primary, #111827);
+      border-radius: var(--pt-radius-lg, 14px);
       padding: 32px;
       max-width: 500px;
       width: 90%;
       max-height: 80vh;
       overflow-y: auto;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      box-shadow: var(--pt-shadow, 0 20px 60px rgba(0,0,0,0.3));
       position: relative;
     `;
 
@@ -123,36 +124,35 @@ class InteractiveTutorial {
       justify-content: space-between;
       margin-bottom: 24px;
       padding-bottom: 16px;
-      border-bottom: 2px solid #f0f0f0;
+      border-bottom: 1px solid var(--pt-border, #e5e7eb);
     `;
 
     const title = document.createElement('h2');
     title.id = 'tutorial-title';
     title.style.cssText = `
       margin: 0;
-      color: #333;
-      font-size: 24px;
-      font-weight: 600;
+      color: var(--pt-text-primary, #111827);
+      font-size: 22px;
+      font-weight: 700;
     `;
 
     const closeBtn = document.createElement('button');
-    closeBtn.innerHTML = '✕';
+    closeBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
     closeBtn.style.cssText = `
       background: none;
       border: none;
-      font-size: 20px;
-      color: #666;
+      color: var(--pt-text-secondary, #4b5563);
       cursor: pointer;
       padding: 8px;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: background 0.2s;
     `;
-    closeBtn.onmouseover = () => closeBtn.style.background = '#f0f0f0';
+    closeBtn.onmouseover = () => closeBtn.style.background = 'var(--pt-bg-muted, #f0f0f0)';
     closeBtn.onmouseout = () => closeBtn.style.background = 'transparent';
     closeBtn.onclick = () => this.close();
 
@@ -165,8 +165,8 @@ class InteractiveTutorial {
     content.style.cssText = `
       margin-bottom: 24px;
       line-height: 1.6;
-      color: #555;
-      font-size: 16px;
+      color: var(--pt-text-secondary, #4b5563);
+      font-size: 15px;
     `;
 
     // Progress bar
@@ -180,7 +180,7 @@ class InteractiveTutorial {
     progressBar.style.cssText = `
       width: 100%;
       height: 6px;
-      background: #f0f0f0;
+      background: var(--pt-bg-muted, #f0f0f0);
       border-radius: 3px;
       overflow: hidden;
     `;
@@ -189,7 +189,7 @@ class InteractiveTutorial {
     progressFill.id = 'tutorial-progress-fill';
     progressFill.style.cssText = `
       height: 100%;
-      background: linear-gradient(90deg, #667eea, #764ba2);
+      background: var(--pt-accent, #5b5bd6);
       border-radius: 3px;
       transition: width 0.3s ease;
       width: 0%;
@@ -210,43 +210,43 @@ class InteractiveTutorial {
     backBtn.id = 'tutorial-back';
     backBtn.textContent = '← Back';
     backBtn.style.cssText = `
-      background: #f0f0f0;
+      background: var(--pt-bg-muted, #f0f0f0);
       border: none;
       padding: 12px 20px;
-      border-radius: 8px;
+      border-radius: var(--pt-radius-sm, 8px);
       cursor: pointer;
       font-size: 14px;
-      color: #666;
-      transition: all 0.2s;
+      color: var(--pt-text-secondary, #4b5563);
+      transition: background 0.2s;
     `;
-    backBtn.onmouseover = () => backBtn.style.background = '#e0e0e0';
-    backBtn.onmouseout = () => backBtn.style.background = '#f0f0f0';
+    backBtn.onmouseover = () => backBtn.style.background = 'var(--pt-border, #e0e0e0)';
+    backBtn.onmouseout = () => backBtn.style.background = 'var(--pt-bg-muted, #f0f0f0)';
     backBtn.onclick = () => this.previousStep();
 
     const nextBtn = document.createElement('button');
     nextBtn.id = 'tutorial-next';
     nextBtn.textContent = 'Next →';
     nextBtn.style.cssText = `
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: var(--pt-accent, #5b5bd6);
       border: none;
       padding: 12px 24px;
-      border-radius: 8px;
+      border-radius: var(--pt-radius-sm, 8px);
       cursor: pointer;
       font-size: 14px;
       color: white;
-      font-weight: 500;
-      transition: all 0.2s;
+      font-weight: 600;
+      transition: opacity 0.2s;
     `;
-    nextBtn.onmouseover = () => nextBtn.style.transform = 'translateY(-1px)';
-    nextBtn.onmouseout = () => nextBtn.style.transform = 'translateY(0)';
+    nextBtn.onmouseover = () => nextBtn.style.opacity = '0.88';
+    nextBtn.onmouseout = () => nextBtn.style.opacity = '1';
     nextBtn.onclick = () => this.nextStep();
 
     const skipBtn = document.createElement('button');
-    skipBtn.textContent = 'Skip Tutorial';
+    skipBtn.textContent = 'Skip tutorial';
     skipBtn.style.cssText = `
       background: none;
       border: none;
-      color: #999;
+      color: var(--pt-text-muted, #9ca3af);
       cursor: pointer;
       font-size: 14px;
       text-decoration: underline;
@@ -290,14 +290,14 @@ class InteractiveTutorial {
     backBtn.style.display = stepIndex === 0 ? 'none' : 'block';
     
     if (step.action === 'finish') {
-      nextBtn.textContent = 'Get Started! 🚀';
-      nextBtn.style.background = 'linear-gradient(135deg, #4CAF50, #45a049)';
+      nextBtn.textContent = 'Get started!';
+      nextBtn.style.background = 'var(--pt-success, #1a9d5c)';
     } else if (step.action === 'demo') {
-      nextBtn.textContent = 'Try It Now!';
-      nextBtn.style.background = 'linear-gradient(135deg, #FF9800, #F57C00)';
+      nextBtn.textContent = 'Try it now';
+      nextBtn.style.background = 'var(--pt-warning, #c17a10)';
     } else {
       nextBtn.textContent = 'Next →';
-      nextBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+      nextBtn.style.background = 'var(--pt-accent, #5b5bd6)';
     }
 
     this.currentStep = stepIndex;

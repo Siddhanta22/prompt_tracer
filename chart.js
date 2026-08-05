@@ -6,12 +6,12 @@
 class PromptTracerCharts {
   constructor() {
     this.colors = {
-      primary: '#667eea',
-      secondary: '#764ba2',
-      success: '#4caf50',
-      warning: '#ff9800',
-      danger: '#f44336',
-      info: '#2196f3',
+      primary: '#5b5bd6',
+      secondary: '#5b5bd6',
+      success: '#1a9d5c',
+      warning: '#c17a10',
+      danger: '#d13c3c',
+      info: '#5b5bd6',
       light: '#f8f9fa',
       dark: '#333'
     };
@@ -21,7 +21,7 @@ class PromptTracerCharts {
   createTrendChart(containerId, data) {
     const container = document.getElementById(containerId);
     if (!container || !data || data.length === 0) {
-      container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">No data available</div>';
+      container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 30px; font-size: 13px;">No data available</div>';
       return;
     }
 
@@ -33,8 +33,6 @@ class PromptTracerCharts {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', width);
     svg.setAttribute('height', height);
-    svg.style.background = '#f8f9fa';
-    svg.style.borderRadius = '8px';
 
     // Calculate scales
     const xScale = (width - margin.left - margin.right) / (data.length - 1);
@@ -116,7 +114,7 @@ class PromptTracerCharts {
   createPlatformChart(containerId, data) {
     const container = document.getElementById(containerId);
     if (!container || !data || Object.keys(data).length === 0) {
-      container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">No platform data available</div>';
+      container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 30px; font-size: 13px;">No platform data available</div>';
       return;
     }
 
@@ -130,8 +128,6 @@ class PromptTracerCharts {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', width);
     svg.setAttribute('height', height);
-    svg.style.background = '#f8f9fa';
-    svg.style.borderRadius = '8px';
 
     platforms.forEach((platform, i) => {
       const value = data[platform];
@@ -156,7 +152,7 @@ class PromptTracerCharts {
       text.setAttribute('text-anchor', 'middle');
       text.setAttribute('font-size', '12');
       text.setAttribute('font-weight', '600');
-      text.setAttribute('fill', '#333');
+      text.style.fill = 'var(--text-primary)';
       text.textContent = value;
 
       // Add platform label
@@ -165,7 +161,7 @@ class PromptTracerCharts {
       platformLabel.setAttribute('y', height - margin.bottom + 15);
       platformLabel.setAttribute('text-anchor', 'middle');
       platformLabel.setAttribute('font-size', '10');
-      platformLabel.setAttribute('fill', '#666');
+      platformLabel.style.fill = 'var(--text-secondary)';
       platformLabel.textContent = this.getPlatformIcon(platform);
 
       svg.appendChild(rect);
@@ -181,7 +177,7 @@ class PromptTracerCharts {
   createScoreDistributionChart(containerId, data) {
     const container = document.getElementById(containerId);
     if (!container || !data || data.length === 0) {
-      container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">No score data available</div>';
+      container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 30px; font-size: 13px;">No score data available</div>';
       return;
     }
 
@@ -240,16 +236,16 @@ class PromptTracerCharts {
     centerText.setAttribute('y', centerY - 5);
     centerText.setAttribute('text-anchor', 'middle');
     centerText.setAttribute('font-size', '16');
-    centerText.setAttribute('font-weight', '700');
-    centerText.setAttribute('fill', this.colors.dark);
+    centerText.setAttribute('font-weight', '600');
+    centerText.style.fill = 'var(--text-primary)';
     centerText.textContent = total;
-    
+
     const centerLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     centerLabel.setAttribute('x', centerX);
     centerLabel.setAttribute('y', centerY + 10);
     centerLabel.setAttribute('text-anchor', 'middle');
     centerLabel.setAttribute('font-size', '10');
-    centerLabel.setAttribute('fill', '#666');
+    centerLabel.style.fill = 'var(--text-secondary)';
     centerLabel.textContent = 'Prompts';
 
     svg.appendChild(centerText);
@@ -299,11 +295,11 @@ class PromptTracerCharts {
 
   getScoreColor(range) {
     const colors = {
-      '0-20': '#f44336',
-      '21-40': '#ff9800',
-      '41-60': '#ffc107',
-      '61-80': '#4caf50',
-      '81-100': '#2196f3'
+      '0-20': '#d13c3c',
+      '21-40': '#c17a10',
+      '41-60': '#d1a512',
+      '61-80': '#1a9d5c',
+      '81-100': '#5b5bd6'
     };
     return colors[range] || '#6b7280';
   }
@@ -315,7 +311,7 @@ class PromptTracerCharts {
     yAxis.setAttribute('y1', margin.top);
     yAxis.setAttribute('x2', margin.left);
     yAxis.setAttribute('y2', height - margin.bottom);
-    yAxis.setAttribute('stroke', '#ddd');
+    yAxis.style.stroke = 'var(--border)';
     yAxis.setAttribute('stroke-width', '1');
     svg.appendChild(yAxis);
 
@@ -325,7 +321,7 @@ class PromptTracerCharts {
     xAxis.setAttribute('y1', height - margin.bottom);
     xAxis.setAttribute('x2', width - margin.right);
     xAxis.setAttribute('y2', height - margin.bottom);
-    xAxis.setAttribute('stroke', '#ddd');
+    xAxis.style.stroke = 'var(--border)';
     xAxis.setAttribute('stroke-width', '1');
     svg.appendChild(xAxis);
 
@@ -337,7 +333,7 @@ class PromptTracerCharts {
       label.setAttribute('y', y + 4);
       label.setAttribute('text-anchor', 'end');
       label.setAttribute('font-size', '10');
-      label.setAttribute('fill', '#666');
+      label.style.fill = 'var(--text-secondary)';
       label.textContent = i;
       svg.appendChild(label);
     }

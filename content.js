@@ -409,9 +409,107 @@ class PromptTracer {
     return 'unknown';
   }
 
+  // Design tokens + component classes + animations shared by the panel, the
+  // floating trigger button, toasts, and the shortcuts modal. Injected once,
+  // as early as possible, so dark mode is correct even before any of those
+  // elements exist yet.
+  injectSharedStyles() {
+    if (document.getElementById('prompt-tracer-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'prompt-tracer-styles';
+    style.textContent = `
+      #prompt-tracer-panel, #prompt-tracer-button, #prompt-tracer-tutorial, .pt-toast, .pt-modal-overlay {
+        --pt-bg: #ffffff;
+        --pt-bg-subtle: #f9fafb;
+        --pt-bg-muted: #f3f4f6;
+        --pt-border: #e5e7eb;
+        --pt-border-strong: #d1d5db;
+        --pt-text-primary: #111827;
+        --pt-text-secondary: #4b5563;
+        --pt-text-muted: #9ca3af;
+        --pt-accent: #5b5bd6;
+        --pt-accent-hover: #4747c2;
+        --pt-accent-subtle: #eef0fd;
+        --pt-accent-text: #4338ca;
+        --pt-success: #1a9d5c;
+        --pt-success-subtle: #e8f7ef;
+        --pt-success-text: #0f7a45;
+        --pt-warning: #c17a10;
+        --pt-warning-subtle: #fdf3e2;
+        --pt-warning-text: #92590a;
+        --pt-danger: #d13c3c;
+        --pt-danger-subtle: #fbeaea;
+        --pt-danger-text: #a82a2a;
+        --pt-radius-sm: 6px;
+        --pt-radius-md: 8px;
+        --pt-radius-lg: 14px;
+        --pt-shadow: 0 20px 60px rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.06);
+        color-scheme: light dark;
+      }
+      @media (prefers-color-scheme: dark) {
+        #prompt-tracer-panel, #prompt-tracer-button, #prompt-tracer-tutorial, .pt-toast, .pt-modal-overlay {
+          --pt-bg: #1c1c1f;
+          --pt-bg-subtle: #232326;
+          --pt-bg-muted: #2a2a2e;
+          --pt-border: #38383d;
+          --pt-border-strong: #4a4a50;
+          --pt-text-primary: #f4f4f5;
+          --pt-text-secondary: #a8a8b3;
+          --pt-text-muted: #75757f;
+          --pt-accent: #8b8bf0;
+          --pt-accent-hover: #a3a3f5;
+          --pt-accent-subtle: rgba(139,139,240,0.16);
+          --pt-accent-text: #c7c7f9;
+          --pt-success-subtle: rgba(26,157,92,0.16);
+          --pt-success-text: #4ade95;
+          --pt-warning-subtle: rgba(193,122,16,0.18);
+          --pt-warning-text: #f0ac52;
+          --pt-danger-subtle: rgba(209,60,60,0.18);
+          --pt-danger-text: #f28080;
+          --pt-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+        }
+      }
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+      }
+      #prompt-tracer-panel * { box-sizing: border-box; }
+      .pt-icon-btn {
+        background: rgba(255,255,255,0.15);
+        border: none;
+        cursor: pointer;
+        color: white;
+        border-radius: var(--pt-radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s ease;
+      }
+      .pt-icon-btn:hover { background: rgba(255,255,255,0.28); }
+      .pt-btn {
+        border: none;
+        border-radius: var(--pt-radius-sm);
+        cursor: pointer;
+        font-weight: 600;
+        transition: background 0.15s ease, opacity 0.15s ease;
+      }
+      .pt-btn-primary { background: var(--pt-accent); color: white; }
+      .pt-btn-primary:hover { background: var(--pt-accent-hover); }
+      .pt-btn-success { background: var(--pt-success); color: white; }
+      .pt-btn-danger { background: var(--pt-danger); color: white; }
+      #prompt-tracer-panel a { color: var(--pt-accent); }
+    `;
+    document.head.appendChild(style);
+  }
+
   async init() {
     try {
       console.log('Prompt Tracer: init() called');
+      this.injectSharedStyles();
       if (this.platform === 'unknown') {
         console.log('Prompt Tracer: Platform not supported');
         this.showPlatformNotSupported();
@@ -591,26 +689,28 @@ class PromptTracer {
   }
 
   showShortcutNotification(message) {
+    this.injectSharedStyles();
     const notification = document.createElement('div');
+    notification.className = 'pt-toast';
     notification.style.cssText = `
       position: fixed;
       top: 20px;
       left: 50%;
       transform: translateX(-50%);
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: var(--pt-accent);
       color: white;
       padding: 12px 20px;
-      border-radius: 8px;
+      border-radius: var(--pt-radius-md);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 14px;
       z-index: 1000000;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      box-shadow: var(--pt-shadow);
       max-width: 400px;
       text-align: center;
       font-weight: 500;
     `;
     notification.textContent = message;
-    
+
     document.body.appendChild(notification);
     
     setTimeout(() => {
@@ -649,14 +749,16 @@ class PromptTracer {
   }
 
   showKeyboardShortcutsHelp() {
+    this.injectSharedStyles();
     const helpModal = document.createElement('div');
+    helpModal.className = 'pt-modal-overlay';
     helpModal.style.cssText = `
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.6);
       z-index: 1000000;
       display: flex;
       align-items: center;
@@ -666,63 +768,50 @@ class PromptTracer {
 
     const modal = document.createElement('div');
     modal.style.cssText = `
-      background: white;
-      border-radius: 16px;
+      background: var(--pt-bg);
+      color: var(--pt-text-primary);
+      border-radius: var(--pt-radius-lg);
       padding: 32px;
       max-width: 500px;
       width: 90%;
       max-height: 80vh;
       overflow-y: auto;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      box-shadow: var(--pt-shadow);
       position: relative;
+    `;
+
+    const shortcutRow = (title, description, keys) => `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--pt-bg-subtle); border-radius: var(--pt-radius-md); margin-bottom: 8px;">
+        <div>
+          <div style="font-weight: 600; color: var(--pt-text-primary);">${title}</div>
+          <div style="font-size: 14px; color: var(--pt-text-secondary);">${description}</div>
+        </div>
+        <kbd style="background: var(--pt-bg-muted); border: 1px solid var(--pt-border); color: var(--pt-text-primary); padding: 4px 8px; border-radius: var(--pt-radius-sm); font-family: monospace;">${keys}</kbd>
+      </div>
     `;
 
     modal.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-        <h2 style="margin: 0; color: #333; font-size: 24px; font-weight: 600;">⌨️ Keyboard Shortcuts</h2>
-        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background: none; border: none; cursor: pointer; font-size: 24px; color: #666; padding: 4px;">×</button>
+        <h2 style="margin: 0; color: var(--pt-text-primary); font-size: 22px; font-weight: 700;">Keyboard shortcuts</h2>
+        <button id="pt-close-shortcuts-help" class="pt-icon-btn" style="background: transparent; color: var(--pt-text-secondary); width: 28px; height: 28px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
-      
-      <div style="space-y: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px;">
-          <div>
-            <div style="font-weight: 600; color: #333;">Quick Analysis</div>
-            <div style="font-size: 14px; color: #666;">Analyze current prompt</div>
-          </div>
-          <kbd style="background: #e9ecef; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl+Shift+P</kbd>
-        </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px;">
-          <div>
-            <div style="font-weight: 600; color: #333;">Copy Optimized</div>
-            <div style="font-size: 14px; color: #666;">Copy last optimized prompt</div>
-          </div>
-          <kbd style="background: #e9ecef; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl+Shift+O</kbd>
-        </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px;">
-          <div>
-            <div style="font-weight: 600; color: #333;">Open Dashboard</div>
-            <div style="font-size: 14px; color: #666;">View analytics and settings</div>
-          </div>
-          <kbd style="background: #e9ecef; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl+Shift+D</kbd>
-        </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px;">
-          <div>
-            <div style="font-weight: 600; color: #333;">Show Help</div>
-            <div style="font-size: 14px; color: #666;">Display this shortcuts guide</div>
-          </div>
-          <kbd style="background: #e9ecef; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl+Shift+H</kbd>
-        </div>
+
+      <div>
+        ${shortcutRow('Quick analysis', 'Analyze current prompt', 'Ctrl+Shift+P')}
+        ${shortcutRow('Copy optimized', 'Copy last optimized prompt', 'Ctrl+Shift+O')}
+        ${shortcutRow('Open dashboard', 'View analytics and settings', 'Ctrl+Shift+D')}
+        ${shortcutRow('Show help', 'Display this shortcuts guide', 'Ctrl+Shift+H')}
       </div>
-      
-      <div style="margin-top: 24px; padding: 16px; background: linear-gradient(135deg, #f8f9ff, #e8ecff); border-radius: 8px;">
-        <div style="font-size: 14px; color: #666; text-align: center;">
-          <strong>💡 Pro Tip:</strong> These shortcuts work on any AI platform where Prompt Tracer is active
+
+      <div style="margin-top: 24px; padding: 16px; background: var(--pt-accent-subtle); border-radius: var(--pt-radius-md);">
+        <div style="font-size: 14px; color: var(--pt-text-secondary); text-align: center;">
+          <strong style="color: var(--pt-text-primary);">Pro tip:</strong> these shortcuts work on any AI platform where Prompt Tracer is active
         </div>
       </div>
     `;
+    modal.querySelector('#pt-close-shortcuts-help').addEventListener('click', () => helpModal.remove());
 
     helpModal.appendChild(modal);
     document.body.appendChild(helpModal);
@@ -1087,11 +1176,11 @@ class PromptTracer {
     else if (clampedScore < 85) quality = 'excellent';
     else quality = 'masterful';
     const qualityConfig = {
-      basic: { color: '#f44336', label: 'Basic', icon: '🌱', min: 0, max: 30 },
-      developing: { color: '#ff9800', label: 'Developing', icon: '🚀', min: 30, max: 50 },
-      good: { color: '#4caf50', label: 'Good', icon: '✨', min: 50, max: 70 },
-      excellent: { color: '#2196f3', label: 'Excellent', icon: '🌟', min: 70, max: 85 },
-      masterful: { color: '#9c27b0', label: 'Masterful', icon: '👑', min: 85, max: 100 }
+      basic: { color: '#d13c3c', label: 'Basic', icon: '🌱', min: 0, max: 30 },
+      developing: { color: '#c17a10', label: 'Developing', icon: '🚀', min: 30, max: 50 },
+      good: { color: '#1a9d5c', label: 'Good', icon: '✨', min: 50, max: 70 },
+      excellent: { color: '#5b5bd6', label: 'Excellent', icon: '🌟', min: 70, max: 85 },
+      masterful: { color: '#9333ea', label: 'Masterful', icon: '👑', min: 85, max: 100 }
     };
     
     const config = qualityConfig[quality] || qualityConfig.developing;
@@ -1104,10 +1193,10 @@ class PromptTracer {
       top: 20px;
       right: 20px;
       width: 400px;
-      background: white;
+      background: var(--pt-bg, white);
       border: none;
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05);
+      border-radius: var(--pt-radius-lg, 14px);
+      box-shadow: var(--pt-shadow, 0 20px 60px rgba(0,0,0,0.25));
       z-index: 999999;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 14px;
@@ -1119,28 +1208,7 @@ class PromptTracer {
       animation: slideIn 0.3s ease-out;
     `;
 
-    // Add CSS animation
-    if (!document.getElementById('prompt-tracer-styles')) {
-      const style = document.createElement('style');
-      style.id = 'prompt-tracer-styles';
-      style.textContent = `
-        @keyframes slideIn {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
+    this.injectSharedStyles();
 
     // Generate real-time feedback - use rule-based immediately (fast, always works)
     let feedback = this.generateRealTimeFeedback(promptData.prompt, analysis);
@@ -1150,20 +1218,24 @@ class PromptTracer {
     
     panel.innerHTML = `
       <!-- Compact Header -->
-      <div style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 16px 20px; border-radius: 16px 16px 0 0;">
+      <div style="background: var(--pt-accent); padding: 16px 20px; border-radius: var(--pt-radius-lg) var(--pt-radius-lg) 0 0;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 32px; height: 32px; background: rgba(255,255,255,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px;">✨</div>
+            <div style="width: 32px; height: 32px; background: rgba(255,255,255,0.18); border-radius: var(--pt-radius-sm); display: flex; align-items: center; justify-content: center;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
             <div>
               <h3 style="margin: 0; color: white; font-size: 16px; font-weight: 700;">Prompt Optimizer</h3>
-              <div style="font-size: 11px; color: rgba(255,255,255,0.9); margin-top: 2px;">${hasApiKey ? 'AI-powered optimization' : 'Rule-based optimization'}</div>
-        </div>
+              <div style="font-size: 11px; color: rgba(255,255,255,0.85); margin-top: 2px;">${hasApiKey ? 'AI-powered optimization' : 'Rule-based optimization'}</div>
+            </div>
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
-            <button id="settings-btn" style="background: rgba(255,255,255,0.2); border: none; cursor: pointer; font-size: 14px; color: white; padding: 6px 10px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-weight: 500;" title="Open Settings">
-              ⚙️
+            <button id="settings-btn" class="pt-icon-btn" style="width: 28px; height: 28px;" title="Open Settings">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </button>
-            <button id="close-analysis-panel" style="background: rgba(255,255,255,0.2); border: none; cursor: pointer; font-size: 18px; color: white; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
+            <button id="close-analysis-panel" class="pt-icon-btn" style="width: 28px; height: 28px;" title="Close">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -1171,58 +1243,56 @@ class PromptTracer {
       ${this.renderCoreMetricsPanel(metrics, clampedScore, quality, config, analysis.checks)}
 
       <!-- Feedback Section -->
-      <div id="prompt-tracer-feedback" style="padding: 16px 20px; background: white; border-bottom: 1px solid #e5e7eb;">
+      <div id="prompt-tracer-feedback" style="padding: 16px 20px; background: var(--pt-bg); border-bottom: 1px solid var(--pt-border);">
         ${this.renderFeedbackItems(feedback)}
       </div>
 
       <!-- Optimized Prompt (Main Focus - Always Visible) -->
-      <div style="padding: 20px; background: white; flex: 1; overflow-y: auto;">
+      <div style="padding: 20px; background: var(--pt-bg); flex: 1; overflow-y: auto;">
         ${llmOptimizedPrompt ? `
           <div style="margin-bottom: 0;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-size: 16px;">🚀</span>
-                <span style="font-size: 13px; font-weight: 600; color: #374151;">Ready-to-Use Version</span>
+              <div style="display: flex; align-items: center; gap: 6px; color: var(--pt-text-secondary);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"></path></svg>
+                <span style="font-size: 13px; font-weight: 600; color: var(--pt-text-primary);">Ready-to-use version</span>
+              </div>
+              <button id="copy-optimized" class="pt-btn pt-btn-primary" style="padding: 6px 12px; font-size: 11px;">Copy</button>
             </div>
-              <button id="copy-optimized" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2); transition: all 0.2s;">Copy</button>
-            </div>
-            <div style="background: linear-gradient(135deg, #f8f9ff, #f0f4ff); border: 2px solid #e0e7ff; border-radius: 10px; padding: 14px; font-size: 13px; line-height: 1.6; color: #1f2937; position: relative; max-height: 200px; overflow-y: auto;">
+            <div style="background: var(--pt-accent-subtle); border: 1px solid var(--pt-border); border-radius: var(--pt-radius-md); padding: 14px; font-size: 13px; line-height: 1.6; color: var(--pt-text-primary); position: relative; max-height: 200px; overflow-y: auto;">
               <div id="optimized-text" style="white-space: pre-wrap; word-wrap: break-word;">${llmOptimizedPrompt}</div>
-          </div>
-            <div style="margin-top: 10px;">
-              <button id="use-optimized" style="width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.2s;">
-                Use This Prompt
-              </button>
-        </div>
-            ${hasApiKey ? `
-              <div style="margin-top: 8px; text-align: center; font-size: 10px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
-                <span>🤖</span>
-                <span>AI-powered optimization</span>
-        </div>
-            ` : `
-              <div style="margin-top: 12px; padding: 12px; background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fbbf24; border-radius: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-                  <span style="font-size: 16px;">🔑</span>
-                  <div style="flex: 1;">
-                    <div style="font-size: 12px; font-weight: 600; color: #92400e; margin-bottom: 2px;">Enable AI Optimization</div>
-                    <div style="font-size: 10px; color: #78350f;">Add your OpenAI API key for better results</div>
-          </div>
-        </div>
-                <div style="display: flex; gap: 6px; align-items: center;">
-                  <input type="password" id="inline-api-key" placeholder="sk-proj-..." style="flex: 1; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 11px; font-family: 'Monaco', 'Courier New', monospace; background: white;" autocomplete="off">
-                  <button id="save-inline-api-key" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; padding: 8px 14px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2); transition: all 0.2s;">Save</button>
             </div>
-                <div style="margin-top: 8px; font-size: 10px; color: #78350f;">
-                  <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 500;">Get your key here</a>
-          </div>
-          </div>
+            <div style="margin-top: 10px;">
+              <button id="use-optimized" class="pt-btn pt-btn-primary" style="width: 100%; padding: 12px; font-size: 14px;">
+                Use this prompt
+              </button>
+            </div>
+            ${hasApiKey ? `
+              <div style="margin-top: 8px; text-align: center; font-size: 10px; color: var(--pt-text-muted);">
+                AI-powered optimization
+              </div>
+            ` : `
+              <div style="margin-top: 12px; padding: 12px; background: var(--pt-warning-subtle); border: 1px solid var(--pt-border); border-radius: var(--pt-radius-md);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--pt-warning-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+                  <div style="flex: 1;">
+                    <div style="font-size: 12px; font-weight: 600; color: var(--pt-warning-text); margin-bottom: 2px;">Enable AI optimization</div>
+                    <div style="font-size: 10px; color: var(--pt-text-secondary);">Add your OpenAI API key for better results</div>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <input type="password" id="inline-api-key" placeholder="sk-proj-..." style="flex: 1; padding: 8px 10px; border: 1px solid var(--pt-border-strong); border-radius: var(--pt-radius-sm); font-size: 11px; font-family: 'Monaco', 'Courier New', monospace; background: var(--pt-bg); color: var(--pt-text-primary);" autocomplete="off">
+                  <button id="save-inline-api-key" class="pt-btn pt-btn-primary" style="padding: 8px 14px; font-size: 11px; white-space: nowrap;">Save</button>
+                </div>
+                <div style="margin-top: 8px; font-size: 10px; color: var(--pt-text-secondary);">
+                  <a href="https://platform.openai.com/api-keys" target="_blank" style="text-decoration: none; font-weight: 500;">Get your key here</a>
+                </div>
+              </div>
             `}
-        </div>
+          </div>
         ` : `
-          <div style="text-align: center; padding: 30px 20px; color: #9ca3af;">
-            <div style="font-size: 36px; margin-bottom: 8px;">⏳</div>
-            <div style="font-size: 13px; font-weight: 500; color: #6b7280;">Optimizing your prompt...</div>
-            <div style="font-size: 11px; margin-top: 6px; color: #d1d5db;">This may take a few seconds</div>
+          <div style="text-align: center; padding: 30px 20px; color: var(--pt-text-muted);">
+            <div style="font-size: 13px; font-weight: 500; color: var(--pt-text-secondary);">Optimizing your prompt...</div>
+            <div style="font-size: 11px; margin-top: 6px;">This may take a few seconds</div>
           </div>
         `}
       </div>
@@ -1253,18 +1323,8 @@ class PromptTracer {
           this.showShortcutNotification('⚠️ Please reload the extension', 'warning');
         }
       });
-      
-      settingsButton.addEventListener('mouseenter', () => {
-        settingsButton.style.background = 'rgba(255,255,255,0.3)';
-        settingsButton.style.transform = 'scale(1.1)';
-      });
-      
-      settingsButton.addEventListener('mouseleave', () => {
-        settingsButton.style.background = 'rgba(255,255,255,0.2)';
-        settingsButton.style.transform = 'scale(1)';
-      });
     }
-    
+
     // Add close button functionality
     const closeButton = panel.querySelector('#close-analysis-panel');
     if (closeButton) {
@@ -1273,14 +1333,6 @@ class PromptTracer {
         e.stopPropagation();
         panel.style.animation = 'slideIn 0.3s ease-out reverse';
         setTimeout(() => panel.remove(), 300);
-      });
-      
-      closeButton.addEventListener('mouseenter', () => {
-        closeButton.style.background = 'rgba(255,255,255,0.3)';
-      });
-      
-      closeButton.addEventListener('mouseleave', () => {
-        closeButton.style.background = 'rgba(255,255,255,0.2)';
       });
     }
 
@@ -1292,13 +1344,11 @@ class PromptTracer {
         navigator.clipboard.writeText(text).then(() => {
           const originalText = copyButton.textContent;
           copyButton.textContent = '✓ Copied';
-          copyButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
-          copyButton.style.boxShadow = '0 2px 8px rgba(76, 175, 80, 0.3)';
-          
+          copyButton.style.background = 'var(--pt-success)';
+
           setTimeout(() => {
             copyButton.textContent = originalText;
-            copyButton.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
-            copyButton.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)';
+            copyButton.style.background = '';
           }, 2000);
         }).catch(() => {
           const textArea = document.createElement('textarea');
@@ -1327,10 +1377,10 @@ class PromptTracer {
           // Check if extension context is valid
           if (!chrome || !chrome.storage || !chrome.storage.local) {
             saveInlineApiKeyBtn.textContent = 'Reload extension';
-            saveInlineApiKeyBtn.style.background = '#ef4444';
+            saveInlineApiKeyBtn.style.background = 'var(--pt-danger)';
     setTimeout(() => {
               saveInlineApiKeyBtn.textContent = 'Save';
-              saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+              saveInlineApiKeyBtn.style.background = 'var(--pt-accent)';
             }, 3000);
             return;
           }
@@ -1339,20 +1389,20 @@ class PromptTracer {
           
           if (!apiKey) {
             saveInlineApiKeyBtn.textContent = 'Enter key';
-            saveInlineApiKeyBtn.style.background = '#ef4444';
+            saveInlineApiKeyBtn.style.background = 'var(--pt-danger)';
             setTimeout(() => {
               saveInlineApiKeyBtn.textContent = 'Save';
-              saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+              saveInlineApiKeyBtn.style.background = 'var(--pt-accent)';
             }, 2000);
             return;
           }
           
           if (!apiKey.startsWith('sk-')) {
             saveInlineApiKeyBtn.textContent = 'Invalid';
-            saveInlineApiKeyBtn.style.background = '#ef4444';
+            saveInlineApiKeyBtn.style.background = 'var(--pt-danger)';
             setTimeout(() => {
               saveInlineApiKeyBtn.textContent = 'Save';
-              saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+              saveInlineApiKeyBtn.style.background = 'var(--pt-accent)';
             }, 2000);
             return;
           }
@@ -1377,7 +1427,7 @@ class PromptTracer {
               
               if (testResponse && testResponse.success) {
                 saveInlineApiKeyBtn.textContent = '✓ Saved!';
-                saveInlineApiKeyBtn.style.background = '#10b981';
+                saveInlineApiKeyBtn.style.background = 'var(--pt-success)';
                 
                 // Reload the panel with new API key
                 setTimeout(() => {
@@ -1386,10 +1436,10 @@ class PromptTracer {
                 }, 1000);
               } else {
                 saveInlineApiKeyBtn.textContent = 'Failed';
-                saveInlineApiKeyBtn.style.background = '#ef4444';
+                saveInlineApiKeyBtn.style.background = 'var(--pt-danger)';
                 setTimeout(() => {
                   saveInlineApiKeyBtn.textContent = 'Save';
-                  saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+                  saveInlineApiKeyBtn.style.background = 'var(--pt-accent)';
                   saveInlineApiKeyBtn.disabled = false;
                   saveInlineApiKeyBtn.style.opacity = '1';
                 }, 2000);
@@ -1397,10 +1447,10 @@ class PromptTracer {
             } catch (error) {
               console.error('Error testing API key:', error);
               saveInlineApiKeyBtn.textContent = 'Error';
-              saveInlineApiKeyBtn.style.background = '#ef4444';
+              saveInlineApiKeyBtn.style.background = 'var(--pt-danger)';
               setTimeout(() => {
                 saveInlineApiKeyBtn.textContent = 'Save';
-                saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+                saveInlineApiKeyBtn.style.background = 'var(--pt-accent)';
                 saveInlineApiKeyBtn.disabled = false;
                 saveInlineApiKeyBtn.style.opacity = '1';
               }, 2000);
@@ -1409,10 +1459,10 @@ class PromptTracer {
         } catch (error) {
           console.error('Error saving API key:', error);
           saveInlineApiKeyBtn.textContent = 'Error';
-          saveInlineApiKeyBtn.style.background = '#ef4444';
+          saveInlineApiKeyBtn.style.background = 'var(--pt-danger)';
           setTimeout(() => {
             saveInlineApiKeyBtn.textContent = 'Save';
-            saveInlineApiKeyBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+            saveInlineApiKeyBtn.style.background = 'var(--pt-accent)';
             saveInlineApiKeyBtn.disabled = false;
             saveInlineApiKeyBtn.style.opacity = '1';
           }, 2000);
@@ -1461,33 +1511,23 @@ class PromptTracer {
         }
         
         if (filled) {
-          useButton.textContent = '✓ Prompt Inserted!';
-          useButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
-    setTimeout(() => {
+          useButton.textContent = '✓ Prompt inserted!';
+          useButton.style.background = 'var(--pt-success)';
+          setTimeout(() => {
             panel.style.animation = 'slideIn 0.3s ease-out reverse';
             setTimeout(() => panel.remove(), 300);
           }, 1000);
         } else {
           // Fallback: copy to clipboard
           navigator.clipboard.writeText(text).then(() => {
-            useButton.textContent = '✓ Copied to Clipboard!';
-            useButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
+            useButton.textContent = '✓ Copied to clipboard!';
+            useButton.style.background = 'var(--pt-success)';
             setTimeout(() => {
               panel.style.animation = 'slideIn 0.3s ease-out reverse';
               setTimeout(() => panel.remove(), 300);
             }, 1000);
           });
         }
-      });
-      
-      useButton.addEventListener('mouseenter', () => {
-        useButton.style.transform = 'translateY(-2px)';
-        useButton.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
-      });
-      
-      useButton.addEventListener('mouseleave', () => {
-        useButton.style.transform = 'translateY(0)';
-        useButton.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
       });
     }
 
@@ -1498,29 +1538,31 @@ class PromptTracer {
   }
 
   renderCoreMetricsPanel(metrics, overallScore, quality, qualityConfig, checks) {
-    const config = qualityConfig || { color: '#667eea', icon: '✨', label: 'Analyzing' };
+    const config = qualityConfig || { color: 'var(--pt-accent)', icon: '✨', label: 'Analyzing' };
+    const checkIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--pt-success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    const emptyIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--pt-border-strong)" stroke-width="2"><circle cx="12" cy="12" r="9"></circle></svg>`;
     const checklist = (checks || []).map(({ ok, label }) => `
-      <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: ${ok ? '#111827' : '#6b7280'};">
-        <span style="flex-shrink: 0;">${ok ? '✅' : '⬜️'}</span>
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: ${ok ? 'var(--pt-text-primary)' : 'var(--pt-text-secondary)'};">
+        <span style="flex-shrink: 0; display: flex;">${ok ? checkIcon : emptyIcon}</span>
         <span>${label}</span>
       </div>
     `).join('');
 
     return `
-      <div id="prompt-tracer-metrics" style="padding: 14px 20px; background: white; border-bottom: 1px solid #e5e7eb;">
+      <div id="prompt-tracer-metrics" style="padding: 14px 20px; background: var(--pt-bg); border-bottom: 1px solid var(--pt-border);">
         <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 12px;">
-          <div style="width: 56px; height: 56px; border-radius: 50%; background: conic-gradient(${config.color} ${overallScore}%, #e5e7eb 0); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-            <div style="width: 44px; height: 44px; border-radius: 50%; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <div style="width: 56px; height: 56px; border-radius: 50%; background: conic-gradient(${config.color} ${overallScore}%, var(--pt-border) 0); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--pt-bg); display: flex; flex-direction: column; align-items: center; justify-content: center;">
               <span style="font-size: 16px; font-weight: 800; color: ${config.color}; line-height: 1;">${overallScore}</span>
-              <span style="font-size: 8px; color: #9ca3af; font-weight: 600;">/100</span>
+              <span style="font-size: 8px; color: var(--pt-text-muted); font-weight: 600;">/100</span>
             </div>
           </div>
           <div style="flex: 1;">
-            <div style="font-size: 13px; font-weight: 700; color: #111827; display: flex; align-items: center; gap: 6px;">
+            <div style="font-size: 13px; font-weight: 700; color: var(--pt-text-primary); display: flex; align-items: center; gap: 6px;">
               <span>${config.icon}</span>
               <span>${config.label} quality</span>
             </div>
-            <div style="font-size: 11px; color: #6b7280; margin-top: 4px; line-height: 1.4;">${this.getQualityDescription(quality)}</div>
+            <div style="font-size: 11px; color: var(--pt-text-secondary); margin-top: 4px; line-height: 1.4;">${this.getQualityDescription(quality)}</div>
           </div>
         </div>
         <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -1543,76 +1585,27 @@ class PromptTracer {
 
     if (prioritized.length === 0) {
       return `
-        <div style="text-align: center; padding: 12px; background: #ecfdf5; border-radius: 8px; border: 1px solid #a7f3d0;">
-          <div style="font-size: 14px; font-weight: 600; color: #065f46; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            <span>✨</span>
-            <span>Your prompt looks great!</span>
-          </div>
+        <div style="text-align: center; padding: 12px; background: var(--pt-success-subtle); border-radius: var(--pt-radius-sm); border: 1px solid var(--pt-border);">
+          <div style="font-size: 14px; font-weight: 600; color: var(--pt-success-text);">Your prompt looks great!</div>
         </div>
       `;
     }
 
+    const borderColor = { error: 'var(--pt-danger)', warning: 'var(--pt-warning)', info: 'var(--pt-accent)' };
+
     return `
       <div style="display: flex; flex-direction: column; gap: 10px;">
         ${prioritized.map(item => `
-          <div style="display: flex; align-items: flex-start; gap: 10px; padding-left: 10px; border-left: 3px solid ${item.type === 'error' ? '#ef4444' : item.type === 'warning' ? '#f59e0b' : '#3b82f6'};">
+          <div style="display: flex; align-items: flex-start; gap: 10px; padding-left: 10px; border-left: 3px solid ${borderColor[item.type] || borderColor.info};">
             <span style="font-size: 15px; flex-shrink: 0;">${item.icon}</span>
             <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 2px;">${item.title}</div>
-              <div style="font-size: 11px; color: #6b7280; line-height: 1.4;">${item.suggestion || item.message}</div>
+              <div style="font-size: 12px; font-weight: 600; color: var(--pt-text-primary); margin-bottom: 2px;">${item.title}</div>
+              <div style="font-size: 11px; color: var(--pt-text-secondary); line-height: 1.4;">${item.suggestion || item.message}</div>
             </div>
           </div>
         `).join('')}
       </div>
     `;
-  }
-
-  renderMetrics(metrics) {
-    const metricConfigs = {
-      clarity: { icon: '🎯', label: 'Clarity', color: '#4caf50' },
-      specificity: { icon: '📊', label: 'Specificity', color: '#2196f3' },
-      structure: { icon: '📋', label: 'Structure', color: '#ff9800' },
-      context: { icon: '🌍', label: 'Context', color: '#9c27b0' },
-      intent: { icon: '🎯', label: 'Intent', color: '#f44336' },
-      completeness: { icon: '✅', label: 'Completeness', color: '#00bcd4' },
-      creativity: { icon: '🎨', label: 'Creativity', color: '#e91e63' },
-      precision: { icon: '⚡', label: 'Precision', color: '#795548' },
-      engagement: { icon: '💫', label: 'Engagement', color: '#607d8b' },
-      adaptability: { icon: '🔄', label: 'Adaptability', color: '#3f51b5' },
-      technical_quality: { icon: '⚙️', label: 'Technical Quality', color: '#009688' },
-      output_potential: { icon: '🚀', label: 'Output Potential', color: '#ff5722' }
-    };
-
-    return Object.entries(metrics).map(([key, value]) => {
-      const config = metricConfigs[key] || { icon: '📊', label: key.charAt(0).toUpperCase() + key.slice(1), color: '#666666' };
-      const percentage = Math.round(value <= 1 ? value * 100 : value);
-      const color = percentage >= 70 ? '#4caf50' : percentage >= 50 ? '#ff9800' : '#f44336';
-      
-      return `
-        <div style="background: #f8f9fa; border-radius: 8px; padding: 12px; border-left: 4px solid ${color};">
-          <div style="display: flex; align-items: center; margin-bottom: 8px;">
-            <span style="font-size: 16px; margin-right: 8px;">${config.icon}</span>
-            <span style="font-size: 12px; font-weight: 600; color: #333;">${config.label}</span>
-          </div>
-          <div style="font-size: 18px; font-weight: bold; color: ${color};">${percentage}%</div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  renderInsights(insights) {
-    if (insights.length === 0) {
-      return '<p style="color: #666; font-style: italic; margin: 0;">No specific insights for this prompt.</p>';
-    }
-
-    return insights.map(insight => `
-      <div style="background: #f8f9fa; border-radius: 8px; padding: 12px; margin-bottom: 8px; border-left: 4px solid #667eea;">
-        <div style="display: flex; align-items: flex-start;">
-          <span style="font-size: 16px; margin-right: 8px; margin-top: 2px;">${insight.icon}</span>
-          <span style="font-size: 13px; color: #333; line-height: 1.4;">${insight.message}</span>
-        </div>
-      </div>
-    `).join('');
   }
 
   getQualityDescription(quality) {
@@ -1626,60 +1619,17 @@ class PromptTracer {
     return descriptions[quality] || descriptions.developing;
   }
 
-  getProTip(quality, hasOptimization) {
-    const tips = {
-      basic: 'Start by adding specific details and context to your prompt',
-      developing: 'Try using bullet points and clear action words',
-      good: 'Consider adding constraints and format specifications',
-      excellent: 'Experiment with different prompt structures and styles',
-      masterful: 'Share your techniques with others!'
-    };
-    
-    const baseTip = tips[quality] || tips.developing;
-    return hasOptimization ? 
-      `${baseTip} Use the optimized version above for even better results.` : 
-      baseTip;
-  }
-
-  getQualityEmoji(quality) {
-    const emojis = {
-      basic: '🌱',
-      developing: '🚀',
-      good: '✨',
-      excellent: '🌟',
-      masterful: '👑'
-    };
-    return emojis[quality] || emojis.developing;
-  }
-
-  getQualityAction(quality) {
-    const actions = {
-      basic: 'Add more detail',
-      developing: 'Enhance structure',
-      good: 'Fine-tune',
-      excellent: 'Optimize further',
-      masterful: 'Perfect!'
-    };
-    return actions[quality] || actions.developing;
-  }
-
   showErrorNotification(message, type = 'error', duration = 5000) {
     try {
       const colors = {
-        error: '#f44336',
-        warning: '#ff9800',
-        info: '#2196f3',
-        success: '#4caf50'
+        error: 'var(--pt-danger)',
+        warning: 'var(--pt-warning)',
+        info: 'var(--pt-accent)',
+        success: 'var(--pt-success)'
       };
-      
-      const icons = {
-        error: '❌',
-        warning: '⚠️',
-        info: 'ℹ️',
-        success: '✅'
-      };
-      
+
       const notification = document.createElement('div');
+      notification.className = 'pt-toast';
       notification.style.cssText = `
         position: fixed;
         top: 20px;
@@ -1688,34 +1638,29 @@ class PromptTracer {
         background: ${colors[type] || colors.error};
         color: white;
         padding: 12px 20px;
-        border-radius: 8px;
+        border-radius: var(--pt-radius-md);
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         font-size: 14px;
+        font-weight: 500;
         z-index: 1000000;
-        box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+        box-shadow: var(--pt-shadow);
         max-width: 400px;
         text-align: center;
-        display: flex;
-        align-items: center;
-        gap: 8px;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: opacity 0.2s ease;
       `;
-      
-      notification.innerHTML = `
-        <span style="font-size: 16px;">${icons[type] || icons.error}</span>
-        <span>${message}</span>
-      `;
-      
+
+      notification.textContent = message;
+
       // Add click to dismiss
       notification.onclick = () => {
         if (notification.parentElement) {
           notification.remove();
         }
       };
-      
+
       document.body.appendChild(notification);
-      
+
       setTimeout(() => {
         if (notification.parentElement) {
           notification.remove();
@@ -1728,40 +1673,39 @@ class PromptTracer {
 
   showPlatformNotSupported() {
     const notification = document.createElement('div');
+    notification.className = 'pt-toast';
     notification.style.cssText = `
       position: fixed;
       top: 20px;
       right: 20px;
-      background: linear-gradient(135deg, #ff9800, #f57c00);
-      color: white;
+      background: var(--pt-bg);
+      color: var(--pt-text-primary);
+      border: 1px solid var(--pt-border);
       padding: 16px 20px;
-      border-radius: 12px;
+      border-radius: var(--pt-radius-lg);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 14px;
       z-index: 1000000;
-      box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+      box-shadow: var(--pt-shadow);
       max-width: 350px;
       cursor: pointer;
     `;
-    
+
     notification.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-        <span style="font-size: 18px;">🚫</span>
-        <strong>Platform Not Supported</strong>
-      </div>
-      <div style="font-size: 13px; opacity: 0.9; line-height: 1.4;">
-        Prompt Tracer works on ChatGPT, Claude, Grok, and Gemini. 
-        <br><strong>Click here</strong> to learn more about supported platforms.
+      <div style="font-weight: 700; margin-bottom: 6px;">Platform not supported</div>
+      <div style="font-size: 13px; color: var(--pt-text-secondary); line-height: 1.4;">
+        Prompt Tracer works on ChatGPT, Claude, Grok, and Gemini.
+        <br><strong style="color: var(--pt-accent);">Click here</strong> to learn more about supported platforms.
       </div>
     `;
-    
+
     notification.onclick = () => {
-      window.open('https://github.com/yourusername/prompt_tracer#supported-platforms', '_blank');
+      window.open('https://github.com/Siddhanta22/prompt_tracer#supported-platforms', '_blank');
       notification.remove();
     };
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
       if (notification.parentElement) {
         notification.remove();
@@ -1820,7 +1764,7 @@ class PromptTracer {
       right: 20px;
       width: 52px;
       height: 52px;
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: var(--pt-accent, #5b5bd6);
       color: white;
       border-radius: 50%;
       display: flex;
@@ -1828,12 +1772,14 @@ class PromptTracer {
       justify-content: center;
       cursor: pointer;
       z-index: 999999;
-      font-size: 20px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      box-shadow: var(--pt-shadow, 0 4px 12px rgba(0,0,0,0.15));
       pointer-events: auto;
+      transition: background 0.15s ease;
     `;
-    button.innerHTML = '🔍';
-    button.title = 'Analyze Current Prompt';
+    button.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
+    button.title = 'Analyze current prompt';
+    button.addEventListener('mouseenter', () => { button.style.background = 'var(--pt-accent-hover, #4747c2)'; });
+    button.addEventListener('mouseleave', () => { button.style.background = 'var(--pt-accent, #5b5bd6)'; });
 
     // Use a more isolated event listener
     const clickHandler = (e) => {
@@ -2039,11 +1985,11 @@ class PromptTracer {
     const clampedScore = getOverallScoreFromMetrics(metrics);
     let quality = analysis.quality || this.optimizer.determineQuality(clampedScore);
     const qualityConfig = {
-      basic: { color: '#f44336', label: 'Basic', icon: '🌱' },
-      developing: { color: '#ff9800', label: 'Developing', icon: '🚀' },
-      good: { color: '#4caf50', label: 'Good', icon: '✨' },
-      excellent: { color: '#2196f3', label: 'Excellent', icon: '🌟' },
-      masterful: { color: '#9c27b0', label: 'Masterful', icon: '👑' }
+      basic: { color: '#d13c3c', label: 'Basic', icon: '🌱' },
+      developing: { color: '#c17a10', label: 'Developing', icon: '🚀' },
+      good: { color: '#1a9d5c', label: 'Good', icon: '✨' },
+      excellent: { color: '#5b5bd6', label: 'Excellent', icon: '🌟' },
+      masterful: { color: '#9333ea', label: 'Masterful', icon: '👑' }
     };
     const config = qualityConfig[quality] || qualityConfig.developing;
     const metricsSection = this.currentPanel.querySelector('#prompt-tracer-metrics');
@@ -2102,118 +2048,10 @@ class PromptTracer {
       console.log('Cannot update optimized prompt - no panel or no prompt');
       return;
     }
-    
-    console.log('Updating optimized prompt in panel:', optimizedPrompt.substring(0, 50) + '...');
-    
-    // Find the optimized text element (works with both loading and existing states)
+
     const optimizedTextElement = this.currentPanel.querySelector('#optimized-text');
-    const optimizedSection = this.currentPanel.querySelector('[style*="Ready-to-Use Version"]')?.closest('div[style*="padding: 20px"]');
-    const loadingSection = this.currentPanel.querySelector('[style*="Optimizing your prompt"]')?.closest('div[style*="text-align: center"]');
-    
     if (optimizedTextElement) {
-      // Update existing optimized prompt text
       optimizedTextElement.textContent = optimizedPrompt;
-      console.log('Updated existing optimized prompt text');
-    } else if (loadingSection) {
-      // Replace loading section with optimized prompt
-      loadingSection.outerHTML = `
-        <div style="margin-bottom: 0;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 16px;">🚀</span>
-              <span style="font-size: 13px; font-weight: 600; color: #374151;">Ready-to-Use Version</span>
-            </div>
-            <button id="copy-optimized" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2); transition: all 0.2s;">Copy</button>
-          </div>
-          <div style="background: linear-gradient(135deg, #f8f9ff, #f0f4ff); border: 2px solid #e0e7ff; border-radius: 10px; padding: 14px; font-size: 13px; line-height: 1.6; color: #1f2937; position: relative; max-height: 200px; overflow-y: auto;">
-            <div id="optimized-text" style="white-space: pre-wrap; word-wrap: break-word;">${optimizedPrompt}</div>
-          </div>
-          <div style="margin-top: 10px;">
-            <button id="use-optimized" style="width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.2s;">
-              Use This Prompt
-            </button>
-          </div>
-          <div style="margin-top: 8px; text-align: center; font-size: 10px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
-            <span>🤖</span>
-            <span>AI-powered optimization</span>
-          </div>
-        </div>
-      `;
-      console.log('Replaced loading section with optimized prompt');
-      
-      // Re-attach event listeners
-      this.attachOptimizedPromptListeners();
-    } else if (optimizedSection) {
-      // Update existing optimized prompt section
-      const existingText = optimizedSection.querySelector('#optimized-text');
-      if (existingText) {
-        existingText.textContent = optimizedPrompt;
-        console.log('Updated existing optimized prompt in section');
-      }
-    } else {
-      console.log('Could not find optimized prompt section to update');
-    }
-  }
-  
-  attachOptimizedPromptListeners() {
-    if (!this.currentPanel) return;
-    
-    const copyButton = this.currentPanel.querySelector('#copy-optimized');
-    if (copyButton) {
-      copyButton.addEventListener('click', () => {
-        const text = this.currentPanel.querySelector('#optimized-text').textContent;
-        navigator.clipboard.writeText(text).then(() => {
-          const originalText = copyButton.textContent;
-          copyButton.textContent = '✓ Copied';
-          copyButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
-          setTimeout(() => {
-            copyButton.textContent = originalText;
-            copyButton.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
-          }, 2000);
-        });
-      });
-    }
-    
-    const useButton = this.currentPanel.querySelector('#use-optimized');
-    if (useButton) {
-      useButton.addEventListener('click', () => {
-        const text = this.currentPanel.querySelector('#optimized-text').textContent;
-        
-        const selectors = {
-          gpt: ['div[contenteditable="true"]', 'textarea[data-id="root"]', 'textarea[placeholder*="Message"]'],
-          claude: ['div[contenteditable="true"]', 'textarea[placeholder*="Message"]'],
-          grok: ['textarea[placeholder*="Message"]', 'textarea[aria-label*="Ask"]', 'div[contenteditable="true"]', 'textarea'],
-          gemini: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]']
-        };
-        
-        const platformSelectors = selectors[this.platform] || selectors.gpt;
-        let filled = false;
-        
-        for (const selector of platformSelectors) {
-          const element = document.querySelector(selector);
-          if (element) {
-            if (element.contentEditable === 'true') {
-              element.textContent = text;
-              element.dispatchEvent(new Event('input', { bubbles: true }));
-              filled = true;
-            } else if (element.tagName === 'TEXTAREA') {
-              element.value = text;
-              element.dispatchEvent(new Event('input', { bubbles: true }));
-              filled = true;
-            }
-            if (filled) break;
-          }
-        }
-        
-        if (filled) {
-          useButton.textContent = '✓ Prompt Inserted!';
-          useButton.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
-          setTimeout(() => {
-            this.currentPanel.style.animation = 'slideIn 0.3s ease-out reverse';
-            setTimeout(() => this.currentPanel.remove(), 300);
-          }, 1000);
-        }
-      });
     }
   }
 
