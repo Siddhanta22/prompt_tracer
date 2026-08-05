@@ -39,6 +39,7 @@
 - **Help System**: Built-in keyboard shortcuts guide
 - **Accessibility**: Screen reader friendly, keyboard navigation
 - **User Feedback**: Toast notifications for all actions
+- **Adaptive Theming**: A flat, minimal interface that automatically matches your system's light or dark mode — popup, floating panel, and tutorial all follow suit
 
 ### 🔒 **Privacy-First Design**
 - **100% Local**: All processing happens on your device
@@ -161,7 +162,7 @@ prompt_tracer/
 ├── popup.js                  # Popup functionality
 ├── interactive-tutorial.js   # Interactive onboarding
 ├── chart.js                  # Custom analytics charting library
-├── icons/                    # Extension icons (16–128px, SVG source)
+├── icons/                    # Extension icons (16–128px PNG)
 ├── PRIVACY_POLICY.md         # Privacy policy documentation
 └── STORE_LISTING.md          # Chrome Web Store listing copy
 ```
